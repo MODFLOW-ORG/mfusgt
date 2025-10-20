@@ -89,7 +89,7 @@ elif fc_id == 'intel' or fc_id == 'intel-llvm'
   compile_args += ['-fpe0',              # Activate all floating point exceptions
                    '-no-heap-arrays',
                    '-traceback',
-                   '-extend-source'
+                   '-extend-source',
                    '-diag-disable:7416',  # f2008 warning
                    '-diag-disable:7025',  # f2008 warning
                    '-diag-disable:5268',  # Line too long
