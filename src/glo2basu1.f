@@ -1,0 +1,5071 @@
+      SUBROUTINE GLO2BAS8AR(INUNIT,CUNIT,VERSION,IUDIS,IUZON,IUMLT,
+     2   MAXUNIT,IUOC,HEADNG,IUPVAL,MFVNAM,IUCLN,IUGNC,IUGNC2,IUGNCn)
+C     ******************************************************************************
+C     ALLOCATE AND READ BASIC AND DISCRETIZATION INFORMATION FOR ALL PROCESS DOMAINS
+C     ******************************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY:NCOL,NROW,NLAY,NPER,ITMUNI,NJA,NJAS,NJAG,
+     1  IVSD,LENUNI,IXSEC,ITRSS,INBAS,IFREFM,NODES,IOUT,FMBE,
+     2  IUNIT,NIUNIT,HNEW,LAYHDT,LAYHDS,NODLAY,NBOTM,INDDF,IFMBC,
+     3  PERLEN,NSTP,TSMULT,ISSFLG,IUNSTR,MXNODLAY,NCNFBD,DDREF,
+     4  HOLD,IBOUND,RHS,AMAT,BUFF,STRT,IPRCONN,IDSYMRD,ILAYCON4,
+     5  IDEALLOC_LPF,IDEALLOC_HY,INCLN,INGNC,INGNC2,INGNCn,IDPF,IDPT,
+     6  INSGB,ITRNSP,Sn,So,NEQS,ISYMFLG,WADIEPS,IWADI,IWADICLN,iunsat,
+     7  NEQS2,NJA2,ImdT,IDPIN,IDPOUT,IHMSIM,IUIHM,ISYALL,TOP,BOT
+      USE PARAMMODULE,ONLY:MXPAR,MXCLST,MXINST,ICLSUM,IPSUM,
+     1                     INAMLOC,NMLTAR,NZONAR,NPVAL,
+     2                     B,IACTIVE,IPLOC,IPCLST,PARNAM,PARTYP,
+     3                     ZONNAM,MLTNAM,INAME
+      USE GWFBASMODULE,ONLY:MSUM,IHEDFM,IHEDUN,IDDNFM,IDDNUN,IBOUUN,
+     1                 LBHDSV,LBDDSV,LBBOSV,IBUDFL,ICBCFL,IHDDFL,ISPCFL,
+     2                 IAUXSV,IBDOPT,IPRTIM,IPEROC,ITSOC,ICHFLG,IFRCNVG,
+     3                 DELT,PERTIM,TOTIM,HNOFLO,CHEDFM,CDDNFM,CBOUFM,
+     4                 VBVL,VBNM,ISPCFM,ISPCUN,CSPCFM,IDDREF,IDDREFNEW
+C
+      CHARACTER*4 CUNIT(NIUNIT)
+      CHARACTER*(*) VERSION
+      CHARACTER*80 HEADNG(2)
+      CHARACTER*(*) MFVNAM
+      CHARACTER*400 LINE
+C
+      INTEGER, DIMENSION(:,:,:),    ALLOCATABLE  ::ITMP
+      REAL, DIMENSION(:,:,:),ALLOCATABLE  ::HTMP
+      REAL, DIMENSION(:),ALLOCATABLE  ::HTMP1
+      CHARACTER*24 ANAME(2)
+      DATA ANAME(1) /'          BOUNDARY ARRAY'/
+      DATA ANAME(2) /'            INITIAL HEAD'/
+C     ------------------------------------------------------------------
+C1------Allocate scalar variables.
+      allocate(iunsat)
+      iunsat = 0 ! full unsat formulation is on when this is made unity
+      ALLOCATE(NCOL,NROW,NLAY,NPER,NBOTM,NCNFBD,ITMUNI,LENUNI,ITRSS)
+      ALLOCATE(NJA,NJAS,NJAG,ILAYCON4,WADIEPS,IWADI,IWADICLN,IDPF,IDPT,
+     1 INSGB,ImdT,IDPIN,IDPOUT)
+      ALLOCATE(IHMSIM,IUIHM,ISYALL)
+      ALLOCATE(IXSEC,INBAS,IFREFM,NODES,IOUT,MXNODLAY,IUNSTR,IVSD)
+      ALLOCATE(IDEALLOC_LPF,IDEALLOC_HY,ITRNSP,NEQS,IDSYMRD,IPRCONN)
+      ALLOCATE(INCLN,INGNC,INGNC2,INGNCn,ISYMFLG,IDDREF,IDDREFNEW,INDDF)
+      ALLOCATE(NEQS2,NJA2)
+      INCLN = 0
+      INDDF = 0
+      INGNC = 0
+      INGNC2 = 0
+      INGNCn = 0
+      IDEALLOC_HY = 0
+      IDEALLOC_LPF = 0
+      IWADI = 0
+      IWADICLN = 0
+      IDPF = 0
+      IDPT = 0
+      INSGB = 0
+      ImdT = 0
+      IDDREF=0
+      IDDREFNEW=0
+      ALLOCATE(IUNIT(NIUNIT))
+C
+      ALLOCATE(ICLSUM,IPSUM,INAMLOC,NMLTAR,NZONAR,NPVAL)
+      ALLOCATE (B(MXPAR))
+      ALLOCATE (IACTIVE(MXPAR))
+      ALLOCATE (IPLOC(4,MXPAR))
+      ALLOCATE (IPCLST(14,MXCLST))
+      ALLOCATE (PARNAM(MXPAR))
+      ALLOCATE (PARTYP(MXPAR))
+      ALLOCATE (INAME(MXINST))
+C
+      ALLOCATE(MSUM,IHEDFM,IHEDUN,IDDNFM,IDDNUN,IBOUUN,LBHDSV,LBDDSV,
+     1         LBBOSV,ISPCFM,ISPCUN)
+      ALLOCATE(IBUDFL,ICBCFL,IHDDFL,ISPCFL,IAUXSV,IBDOPT,IPRTIM,IPEROC,
+     1         ITSOC,ICHFLG,IFRCNVG)
+      ALLOCATE(DELT,PERTIM,TOTIM,HNOFLO)
+      ALLOCATE(CHEDFM,CDDNFM,CBOUFM,CSPCFM)
+C
+C2------Open all files in name file.
+      CALL SGWF2BAS8OPEN(INUNIT,IOUT,IUNIT,CUNIT,NIUNIT,
+     &                 VERSION,INBAS,MAXUNIT,MFVNAM)
+C
+C3------PRINT A MESSAGE IDENTIFYING THE BASIC PACKAGE.
+      WRITE(IOUT,1)MFVNAM,VERSION,INBAS
+    1 FORMAT(1X,/1X,'BAS -- BASIC PACKAGE',A,A,
+     2' INPUT READ FROM UNIT ',I4)
+C
+C4------Initialize parameter definition variables.
+      IF(IUNIT(27).GT.0) INSGB = 1
+      ITRNSP=0
+      IF(IUNIT(15). GT. 0) ITRNSP=1
+      IPSUM=0
+      ICLSUM=0
+      INAMLOC=1
+      DO 10 N=1,MXPAR
+        PARNAM(N)=' '
+        PARTYP(N)=' '
+        IPLOC(1,N)=0
+        IPLOC(2,N)=0
+        IACTIVE(N)=0
+   10 CONTINUE
+C
+C5------Read first lines of BAS Package file and identify grid type and options.
+C5A-----READ AND PRINT COMMENTS.  SAVE THE FIRST TWO COMMENTS IN HEADNG.
+      HEADNG(1)=' '
+      HEADNG(2)=' '
+      WRITE(IOUT,*)
+      READ(INBAS,'(A)') LINE
+      IF(LINE(1:1).NE.'#') GO TO 20
+      HEADNG(1)=LINE(1:80)
+      WRITE(IOUT,'(1X,A)') HEADNG(1)
+      READ(INBAS,'(A)') LINE
+      IF(LINE(1:1).NE.'#') GO TO 20
+      HEADNG(2)=LINE(1:80)
+      WRITE(IOUT,'(1X,A)') HEADNG(2)
+      CALL URDCOM(INBAS,IOUT,LINE)
+C
+C5B-----LOOK FOR OPTIONS IN THE FIRST ITEM AFTER THE HEADING.
+   20 IXSEC=0
+      ICHFLG=0
+      IFREFM=0
+      IPRTIM=0
+      IUNSTR=0
+      IFRCNVG=0
+      IDPIN = 0
+      IDPOUT = 0
+      IHMSIM = 0
+      IUIHM = 0
+      ISYALL = 0
+      LLOC=1
+      IPRCONN=0
+      IPRES = 0
+   25 CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INBAS)
+      IF(LINE(ISTART:ISTOP).EQ.'XSECTION') THEN
+         IXSEC=1
+      ELSE IF(LINE(ISTART:ISTOP).EQ.'CHTOCH') THEN
+         ICHFLG=1
+      ELSE IF(LINE(ISTART:ISTOP).EQ.'FREE') THEN
+         IFREFM=1
+         WRITE(IOUT,26)
+   26    FORMAT (1X,'THE FREE FORMAT OPTION HAS BEEN SELECTED')
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'PRINTTIME') THEN
+         IPRTIM=1
+         WRITE(IOUT,7)
+    7    FORMAT(1X,'THE PRINTTIME OPTION HAS BEEN SELECTED')
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'UNSTRUCTURED') THEN
+         IUNSTR=1
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'PRINTFV') THEN
+         IPRCONN=1
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'CONVERGE') THEN
+         IFRCNVG=1
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'RICHARDS') THEN
+         IUNSat=1
+         WRITE(IOUT,8)
+    8    FORMAT(1X,'RICHARDS EQUATION SOLUTION')
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'RICHARDS_HP') THEN
+         IUNSat=1 
+         IPRES=1
+         WRITE(IOUT,9)
+    9    FORMAT(1X,'RICHARDS EQUATION SOLUTION WITH INITIAL',
+     1    1X,'PRESSURE HEAD INPUT')   
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'DPIN') THEN
+C----READ OPTIONS FOR SINGLE OR DOUBLE PRECISION READ / WRITE
+          WRITE(IOUT,115)
+115       FORMAT(1X,'INPUT BINARY FILES FOR PRIMARY VARIABLES ',
+     1       'WILL BE IN DOUBLE PRECISION')
+         IDPIN = 1
+      ELSE IF(LINE(ISTART:ISTOP).EQ.'DPOUT') THEN
+         WRITE(IOUT,116)
+116      FORMAT(1X,'OUTPUT BINARY FILES FOR PRIMARY VARIABLES ',
+     1       'WILL BE IN DOUBLE PRECISION')
+         IDPOUT = 1
+      ELSE IF(LINE(ISTART:ISTOP).EQ.'DPIO') THEN
+         WRITE(IOUT,115)
+         WRITE(IOUT,116)
+         IDPIN = 1
+         IDPOUT = 1
+C-----READ OPTIONS FOR IHM SIMULATION
+      ELSE IF(LINE(ISTART:ISTOP).EQ.'IHM') THEN
+         IHMSIM = 1
+         WRITE(IOUT,117)
+117      FORMAT(1X,'MODFLOW-USG IS PART OF AN INTEGRATED HYDROLOGIC',1X,
+     &    'MODEL (IHM) SIMULATION')
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IUIHM,R,IOUT,INOC)
+         IF(IUIHM.GT.0) THEN
+           WRITE (IOUT,118) IUIHM
+118        FORMAT(1X,'IHM SIMULATION DEBUGGING INFORMATION IS WRITTEN'
+     &     1X,'TO FILE ON FORTRAN UNIT' I5)
+         ELSE
+           WRITE (IOUT,119)
+119        FORMAT(1X,'IHM SIMULATION DEBUGGING INFORMATION IS NOT'
+     &     1X,'WRITTEN')
+         ENDIF         
+      ELSE IF(LINE(ISTART:ISTOP).EQ.'SY-ALL') THEN
+         ISYALL = 1 
+         WRITE(IOUT,120)
+120      FORMAT(1X,'IHM SIMULATION REPLACES SY FOR ALL LAYERS')
+      END IF
+      IF(LLOC.LT.200) GO TO 25
+C5C-------SET UNSTRUCTURED FLAG IF DISU IS USED
+      INDIS=IUDIS
+      IF(IUNIT(IUDIS+1).GT.0) THEN
+        IUNSTR=1
+        INDIS=IUDIS+1
+      ENDIF
+C
+C5D-----PRINT A MESSAGE SHOWING OPTIONS.
+      IF(IXSEC.NE.0) WRITE(IOUT,61)
+   61 FORMAT(1X,'CROSS SECTION OPTION IS SPECIFIED')
+      IF(ICHFLG.NE.0) WRITE(IOUT,62)
+   62 FORMAT(1X,'CALCULATE FLOW BETWEEN ADJACENT CONSTANT-HEAD CELLS')
+      IF(IUNSTR.NE.0) WRITE(IOUT,63)
+   63 FORMAT(1X,'THE UNSTRUCTURED GRID OPTION HAS BEEN SELECTED')
+
+C----------------------------------------------------------------------------------------
+C6------ALLOCATE AND READ DISCRETIZATION DATA FOR ALL PROCESS DOMAINS,
+C6------SET GLOBAL PARAMETERS, CONNECTIVITIES AND GEOMETRIC ARRAYS.
+C----------------------------------------------------------------------------------------
+      CALL SGLO2BAS8ARDIS(INDIS,IOUT,IUCLN,IUGNC,IUGNC2,IUGNCn,
+     1   IUNIT(15))
+C----------------------------------------------------------------------------------------
+C7-----Allocate space for remaining global arrays.
+      ALLOCATE (HNEW(NEQS))
+      ALLOCATE (HOLD(NEQS))
+      ALLOCATE (IFMBC)
+      IFMBC = 0
+      ALLOCATE (FMBE(NEQS))
+      ALLOCATE (Sn(NEQS),So(NEQS))
+      Sn = 1.0
+      So = 1.0
+      ALLOCATE (RHS(NEQS))
+      ALLOCATE (BUFF(NEQS))
+      ALLOCATE (STRT(NEQS))
+      DDREF=>STRT
+      ALLOCATE (LAYHDT(NLAY))
+      ALLOCATE (LAYHDS(NLAY))
+      WRITE(IOUT,'(//)')
+C
+C8----Initialize head-dependent thickness indicator to code that
+C8----indicates layer is undefined.
+      DO 100 I=1,NLAY
+        LAYHDT(I)=-1
+        LAYHDS(I)=-1
+  100 CONTINUE
+C9------INITIALIZE TOTAL ELAPSED TIME
+      TOTIM=0.
+C
+C------------------------------------------------------------------------
+C10------Read rest of groundwater BAS Package file (IBOUND and initial heads)
+      IF(IUNSTR.EQ.0)THEN
+C10A-------FOR STRUCTURED GRIDS
+        CALL SGWF2BAS8SR
+      ELSE
+C10B-------FOR UNSTRUCTURED GRIDS
+        CALL SGWF2BAS8UR
+      ENDIF
+C
+C-----------------------------------------------------------------------
+C11-----SET UP OUTPUT CONTROL.
+      CALL SGWF2BAS7I(NLAY,IUNIT(IUOC),IOUT,IFREFM,NIUNIT,IUNIT(15),
+     1  IUNIT(IUCLN))
+C
+C12-----INITIALIZE VOLUMETRIC BUDGET ACCUMULATORS TO ZERO.
+  590 ZERO=0.
+      DO 600 I=1,NIUNIT
+      DO 600 J=1,4
+      VBVL(J,I)=ZERO
+  600 CONTINUE
+C
+C13-----Allocate and read Zone and Multiplier arrays
+      CALL SGWF2BAS7U1ARMZ(IUNIT(IUZON),IUNIT(IUMLT))
+C
+C14-----READ PARAMETER VALUES FILE.
+      CALL SGWF2BAS7U1ARPVAL(IUPVAL)
+C15 ----CONVERT PRESSURE HEAD TO HYDRAULIC HEAD FOR RICHARDS EQUATION WITH PRESSURE HEAD INPUT      
+      IF(IPRES.EQ.1)THEN
+        DO N=1,NODES
+          HNEW(N) = HNEW(N) + (0.5 * (TOP(N) + BOT(N)))  
+          HOLD(N) = HNEW(N)
+        ENDDO    
+      ENDIF
+C15-----return
+      RETURN
+      END
+C--------------------------------------------------------------------------------
+      SUBROUTINE SGWF2BAS8OPEN(INUNIT,IOUT,IUNIT,CUNIT,
+     1              NIUNIT,VERSION,INBAS,MAXUNIT,MFVNAM)
+C     ******************************************************************
+C     OPEN FILES.
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE NAMEFILEMODULE
+      USE GWFBASMODULE, ONLY:IFLUSHS,CFLUSH      
+      INCLUDE 'openspec.inc'
+      DIMENSION IUNIT(NIUNIT)
+      CHARACTER*4 CUNIT(NIUNIT)
+      CHARACTER*7 FILSTAT
+      CHARACTER*20 FILACT, FMTARG, ACCARG
+      CHARACTER*(*) VERSION,MFVNAM
+      CHARACTER*40 SPACES
+      CHARACTER*300 LINE, FNAME
+      CHARACTER*20 FILTYP
+      LOGICAL LOP
+      INTEGER, DIMENSION(99) ::TMPFLUSHS !kkz -tmp for list of binary output unit numbers to flush      
+C     ---------------------------------------------------------------
+C
+C1------INITIALIZE CONSTANTS.
+      INBAS=0
+      NFILE=0
+      IOUT=0
+      DO 5 I=1,NIUNIT
+      IUNIT(I)=0
+5     CONTINUE
+      SPACES=' '
+      LENVER=LEN_TRIM(VERSION)
+      INDENT=40-(LENVER+8)/2
+      ALLOCATE(CFLUSH) !kkz - allocate and initialize count of binary files to flush; move to alloc and dealloc if keeping
+      CFLUSH=1         !kkz - initialize at 1 to account for mandatory output listing file      
+C
+C2------READ A LINE; IGNORE BLANK LINES AND PRINT COMMENT LINES.
+10    READ(INUNIT,'(A)',END=1000) LINE
+      IF(LINE.EQ.' ') GO TO 10
+      IF(LINE(1:1).EQ.'#') THEN
+        IF(NFILE.NE.0 .AND. IOUT.NE.0) WRITE(IOUT,'(A)') LINE
+        GO TO 10
+      END IF
+C
+C3------DECODE THE FILE TYPE, UNIT NUMBER, AND NAME.
+      LLOC=1
+      CALL URWORD(LINE,LLOC,ITYP1,ITYP2,1,N,R,IOUT,INUNIT)
+      FILTYP=LINE(ITYP1:ITYP2)
+      CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IU,R,IOUT,INUNIT)
+      CALL URWORD(LINE,LLOC,INAM1,INAM2,0,N,R,IOUT,INUNIT)
+      IFLEN=INAM2-INAM1+1
+      FNAME(1:IFLEN)=LINE(INAM1:INAM2)
+      INQUIRE(UNIT=IU,OPENED=LOP)
+      IF(LOP) THEN
+         IF(IOUT.EQ.0) THEN
+            WRITE(*,11) FNAME(1:IFLEN),IU
+   11       FORMAT(1X,/1X,'CANNOT OPEN ',A,' ON UNIT',I4,
+     1              ' BECAUSE UNIT IS ALREADY BEING USED')
+         ELSE
+            WRITE(IOUT,11) FNAME(1:IFLEN),IU
+         END IF
+         CALL USTOP(' ')
+      END IF
+C
+C4------KEEP TRACK OF LARGEST UNIT NUMBER
+      IF (IU.GT.MAXUNIT) MAXUNIT = IU
+C
+C5------SET DEFAULT FILE ATTRIBUTES.
+      FMTARG='FORMATTED'
+      ACCARG='SEQUENTIAL'
+      FILSTAT='UNKNOWN'
+      FILACT=' '
+C4A-IHM--ALLOW FOR UNFORMATTED PACKAGES WITH A NEGATIVE UNIT NUMBER
+      IF(IU.LT.0)THEN
+        FMTARG = 'UNFORMATTED'
+        ACCARG = 'STREAM'
+        IU = ABS(IU)
+      ENDIF
+C
+C6------SPECIAL CHECK FOR 1ST FILE.
+      IF(NFILE.EQ.0) THEN
+        IF(FILTYP.EQ.'LIST') THEN
+          IOUT=IU
+          OPEN(UNIT=IU,FILE=FNAME(1:IFLEN),STATUS='REPLACE',
+     1          FORM='FORMATTED',ACCESS='SEQUENTIAL'
+     1          )
+          WRITE(IOUT,60) MFVNAM,SPACES(1:INDENT),VERSION(1:LENVER)
+60        FORMAT(34X,'USG-TRANSPORT ',A,/,
+     &             6X,' FURTHER  DEVELOPMENTS BASED ON MODFLOW-USG',/,
+     &             A,'VERSION ',A,/)
+          WRITE(IOUT,78) FNAME(1:IFLEN),IOUT
+78        FORMAT(1X,'LIST FILE: ',A,/25X,'UNIT ',I4)
+          TMPFLUSHS(CFLUSH)=IU   !kkz - store unit number of the listing file to flush in the tmp array          
+        ELSE
+          WRITE(*,*)
+     1       ' FIRST ENTRY IN NAME FILE MUST BE "LIST".'
+          CALL USTOP(' ')
+        END IF
+C7  Get next file name
+        NFILE=1
+        GO TO 10
+      END IF
+C
+C8------CHECK FOR "BAS" FILE TYPE.
+      IF(FILTYP.EQ.'BAS6') THEN
+         INBAS=IU
+         FILSTAT='OLD    '
+         FILACT=ACTION(1)
+C
+C9------CHECK FOR "UNFORMATTED" FILE TYPE.
+      ELSE IF(FILTYP.EQ.'DATA(BINARY)' .OR.
+     1        FILTYP.EQ.'DATAGLO(BINARY)') THEN
+         FMTARG=FORM
+         ACCARG=ACCESS
+C
+!kkz check for both UNFORMATTED as well as BINARY per JCH
+C9------CHECK FOR "UNFORMATTED" FILE TYPE.
+      ELSE IF(FILTYP.EQ.'DATA(UNFORMATTED)' .OR.
+     1        FILTYP.EQ.'DATAGLO(UNFORMATTED)') THEN
+         FMTARG=FORM
+         ACCARG=ACCESS
+C
+C10-----CHECK FOR "FORMATTED" FILE TYPE.
+      ELSE IF(LINE(ITYP1:ITYP2).EQ.'DATA' .OR.
+     1        LINE(ITYP1:ITYP2).EQ.'DATAGLO') THEN
+         FMTARG='FORMATTED'
+         ACCARG='SEQUENTIAL'
+C
+C11-----CHECK FOR MAJOR OPTIONS.
+      ELSE
+        DO 20 I=1,NIUNIT
+           IF(LINE(ITYP1:ITYP2).EQ.CUNIT(I)) THEN
+              IUNIT(I)=IU
+              FILSTAT='OLD    '
+              FILACT=ACTION(1)
+C --------------IHM - SYF FILES ARE FOR IHM
+              IF(CUNIT(I). EQ. 'SYF') THEN
+                FILSTAT = 'UNKNOWN'
+                FILACT= ACTION (1)
+                SYIU = IU
+                SYFNAME = FNAME
+                SYIFLEN = IFLEN
+                ACCARG='SEQUENTIAL'
+              ENDIF
+C ---------IHM ----------------------------------              
+              GO TO 30
+           END IF
+20      CONTINUE
+        WRITE(IOUT,21) LINE(ITYP1:ITYP2)
+21      FORMAT(1X,'ILLEGAL FILE TYPE IN NAME FILE: ',A)
+        CALL USTOP(' ')
+30      CONTINUE
+        END IF
+C
+C12-----FOR DATA FILES, CHECK FOR "REPLACE" OR "OLD" OPTION
+      IARCVs(NFILE) = 1
+      IFLUSH = 0
+101   CALL URWORD(LINE,LLOC,IOPT1,IOPT2,1,N,R,IOUT,INUNIT)        
+      IF (FILSTAT.EQ.'UNKNOWN') THEN
+        IF (LINE(IOPT1:IOPT2).EQ.'REPLACE' .OR.
+     &      LINE(IOPT1:IOPT2).EQ.'OLD')
+     &      FILSTAT = LINE(IOPT1:IOPT2)
+      ENDIF 
+C12A -----IHM check for archive option for IHM
+        IF(LINE(IOPT1:IOPT2).EQ.'FLUSH') THEN
+          IFLUSH = 1
+          WRITE(IOUT,70) FNAME(1:IFLEN)
+   70     FORMAT(1X,'FLUSH OPTION IS USED FOR THIS FILE',A80)
+        ENDIF
+C12A -----IHM check for archive option for IHM
+        IF(LINE(IOPT1:IOPT2).EQ.'NO-ARCHIVE') THEN
+          IARCVs(nfile) = 0
+          WRITE(IOUT,71) FNAME(1:IFLEN)
+   71     FORMAT(1X,'NO-ARCHIVE OPTION IN IHM IS USED:',
+     1     ' STRESS PERIOD INFORMATION WILL BE REPLACED FOR THIS FILE.',
+     2      A20)
+        ENDIF
+c ----IHM ------------------------------------------------
+      IF(LLOC.LT.300) GO TO 101
+201   CONTINUE      
+C12A----Open file as read-only when 'OLD' is present to allow parallel
+C12A----model runs to read data from file simultaneously.
+      IF (FILACT.EQ.' ') THEN
+        IF (FILSTAT.EQ.'OLD') THEN
+          FILACT=ACTION(1)
+        ELSE
+          FILACT=ACTION(2)
+        ENDIF
+      ENDIF
+C
+C13-----WRITE THE FILE NAME AND OPEN IT.
+      WRITE(IOUT,50) FNAME(1:IFLEN),
+     1     LINE(ITYP1:ITYP2),IU,FILSTAT,FMTARG,ACCARG
+50    FORMAT(1X,/1X,'OPENING ',A,/
+     &  1X,'FILE TYPE:',A,'   UNIT ',I4,3X,'STATUS:',A,/
+     &  1X,'FORMAT:',A,3X,'ACCESS:',A)
+!kkz - ALWAYS BUFFERING. NO IF STATEMENT OR OPTION
+      OPEN(UNIT=IU,FILE=FNAME(1:IFLEN),FORM=FMTARG,  !allows sharing of files for parallel PEST runs
+     1      ACCESS=ACCARG,STATUS=FILSTAT,ACTION=FILACT,ERR=2000)
+c      OPEN(UNIT=IU,FILE=FNAME(1:IFLEN),FORM=FMTARG,  !allows sharing of files for parallel PEST runs
+c     1      ACCESS=ACCARG,STATUS=FILSTAT,ACTION=FILACT,
+c     2      ERR=2000)
+      IF(IFLUSH.NE.0) THEN   !kkz - if not STATUS=OLD, then assume an output file to flush at the end of each timestep
+        CFLUSH = CFLUSH + 1    !kkz - increment counter for files to be flushed
+        TMPFLUSHS(CFLUSH)=IU   !kkz - store unit number of an output file to flush in the tmp array
+      ENDIF
+C
+c11a-------IHM save all file information for each unit that was opened.
+      ii = nfile
+      ius(ii) = iu
+      fnames(ii) = fname(1:iflen)
+      iflens(ii) = iflen
+      filstats(ii) = filstat
+      filacts(ii) = filact
+      fmtargs(ii) = fmtarg
+      accargs(ii) = accarg
+      if(ius(ii).eq.iunit(12)) iarcvs(ii) = 1  ! archive OC file
+      nfiles = nfile
+c IHM--------------------------------------------------
+      NFILE=NFILE+1
+      GO TO 10
+C
+C14-----END OF NAME FILE.  RETURN PROVIDED THAT LISTING FILE AND BAS
+C14-----FILES HAVE BEEN OPENED.
+1000  IF(NFILE.EQ.0) THEN
+         WRITE(*,*) ' NAME FILE IS EMPTY.'
+         CALL USTOP(' ')
+      ELSE IF(INBAS.EQ.0) THEN
+         WRITE(IOUT,*) ' BAS PACKAGE FILE HAS NOT BEEN OPENED.'
+         CALL USTOP(' ')
+      END IF
+      CLOSE (UNIT=INUNIT)
+C
+      !kkz - allocate and fill IFLUSHS from tmp array
+      ALLOCATE(IFLUSHS(CFLUSH))
+      DO 1550 I=1,CFLUSH
+          IFLUSHS(I) = TMPFLUSHS(I)
+1550  CONTINUE
+C
+      RETURN
+C
+C15-----ERROR OPENING FILE.
+ 2000 CONTINUE
+      WRITE(*,2010)FNAME(1:IFLEN),IU,FILSTAT,FMTARG,ACCARG,FILACT
+      WRITE(IOUT,2010)FNAME(1:IFLEN),IU,FILSTAT,FMTARG,ACCARG,FILACT
+ 2010 FORMAT(/,1X,'*** ERROR OPENING FILE "',A,'" ON UNIT ',I5,/,
+     &7X,'SPECIFIED FILE STATUS: ',A,/
+     &7X,'SPECIFIED FILE FORMAT: ',A,/
+     &7X,'SPECIFIED FILE ACCESS: ',A,/
+     &7X,'SPECIFIED FILE ACTION: ',A,/
+     &2X,'-- STOP EXECUTION (SGWF2BAS7OPEN)')
+      CALL USTOP(' ')
+C
+      END
+C-----------------------------------------------------------------------
+      SUBROUTINE SGLO2BAS8ARDIS(IUDIS,IOUT,IUCLN,IUGNC,IUGNC2,IUGNCn,
+     1   INBCT)
+C     *****************************************************************
+C     ALLOCATE AND READ DISCRETIZATION DATA FOR ALL PROCESS DOMAINS,
+C     SET GLOBAL PARAMETERS, CONNECTIVITIES AND GEOMETRIC ARRAYS.
+C     *****************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY:NPER,NCNFBD,ITMUNI,IXSEC,INGNC,INGNC2,INGNCn,
+     1            INCLN,LENUNI,IUNIT,ITRSS,NODES,NODLAY,LAYCBD,INBAS,
+     2            PERLEN,NSTP,TSMULT,ISSFLG,BOT,TOP,IUNSTR,AMAT,AREA,
+     3            IVC,IA,JA,JAS,ISYM,NJA,NJAG,IVSD,DELC,DELR,IPRCONN,
+     4            IBOUND,MXNODLAY,ICONCV,NOCVCO,NEQS,IFREFM,IDSYMRD,
+     5            IATMP,NJATMP,IAG,PGF,FAHL,NJAS,NLAY,JAFL,LAYNOD,
+     6            IA2,JA2,IA1IA2,JA1JA2,NEQS2,NJA2,STORFRAC
+      USE SMSMODULE, ONLY: ISOLVEACTIVE
+      USE CLN1MODULE, ONLY: NCLNNDS,IA_CLN
+      USE SPARSEMODULE
+      TYPE(SPARSEMATRIX) :: SMAT
+      INTEGER,ALLOCATABLE,DIMENSION(:) :: ROWMAXNNZ
+C
+      CHARACTER*400 LINE
+      CHARACTER*24 ANAME
+      REAL*8 PP
+      DATA ANAME /'VERT CONNECT INDEX ARRAY'/
+C
+C     --------------------------------------------------------------------------------
+C1----READ GLOBAL PARAMETERS, UNSTRUCTURED GRID DIMENSIONING AND CONFINING INFORMATION
+C    ---------------------------------------------------------------------------------
+      CALL SDIS2GLO8AR (IUDIS,IOUT)
+C----------------------------------------------------------------------------
+C2------READ CONNECTED LINE NETWORK (CLN) DIMENSIONING AND CONNECTIVITY INPUT
+C----------------------------------------------------------------------------
+      NEQS = NODES
+      INCLN = IUNIT(IUCLN)
+      IF(INCLN.NE.0) THEN
+        CALL SDIS2CLN1AR(IUCLN,INBCT)
+        NEQS = NEQS + NCLNNDS
+      ENDIF
+C---------------------------------------------------------------------
+C3-----READ GNC PACKAGE INPUT  (CONNECTIVITIES AND FRACTIONS)
+C---------------------------------------------------------------------
+      INGNC = IUNIT(IUGNC)
+csp      IF(INGNC.GT.0) THEN
+csp        CALL GNC2DISU1AR(IUGNC)
+csp      ENDIF
+      INGNC2 = IUNIT(IUGNC2)
+csp      IF(INGNC2.GT.0) THEN
+csp        CALL GNCT2DISU1AR(IUGNC2)
+csp      ENDIF
+      INGNCn = IUNIT(IUGNCn)
+      IF(INGNCn.GT.0) THEN
+        CALL GNCn2DISU1AR(IUGNCn)
+      ENDIF
+C--------------------------------------------------------------------------------------
+C4-------REIDENTIFY MAIN PACKAGE AFTER READING BASIC INFORMATION FOR ALL PROCESS DOMAINS
+C--------------------------------------------------------------------------------------
+      INDIS=IUNIT(IUDIS)
+      WRITE(IOUT,11) INDIS
+   11 FORMAT(1X,/1X,'DIS -- UNSTRUCTURED GRID DISCRETIZATION PACKAGE,',
+     1  ' VERSION 1 : 5/17/2010 - INPUT READ FROM UNIT ',I4)
+C--------------------------------------------------------------------------------------
+C5------ALLOCATE SPACE FOR PARAMETERS AND FLAGS.
+      ALLOCATE(IA(NEQS+1))
+      ALLOCATE (IBOUND(NEQS))
+      ALLOCATE(AREA(NEQS))
+      IA = 0
+C
+C-------------------------------------------------------------------------
+C6-------FILL NODLAY ARRAY AND READ GEOMETRIC PARAMETERS
+C6-------AND MATRIX CONNECTIVITY FOR THE 3-D SUBSURFACE DOMAIN
+      IF(IUNSTR.EQ.0)THEN
+C6A-----...FOR STRUCTURED 3-D GRID with MF2005 INPUT STRUCTURE
+        CALL SGWF2DIS8SR(IOUT,INDIS)
+      ELSE
+C6B-----...FOR UNSTRUCTURED 3-D GRID
+        CALL SGWF2DIS8UR(IOUT,INDIS)
+      ENDIF
+C6C----FILL LAYNOD ARRAY WITH LAYER NUMBER FOR EACH NODE
+      ALLOCATE(LAYNOD(NODES))
+      DO K = 1,NLAY
+          NNDLAY = NODLAY(K)
+          NSTRT = NODLAY(K-1)+1
+          DO N=NSTRT,NNDLAY
+            LAYNOD(N) = K
+          ENDDO
+      ENDDO
+C
+C---------------------------------------------------------------------------------
+C7-------NEED NEW IA JA MATRICES WHEN CONNECTIVITY IS EXPANDED DUE TO CLN OR GNC
+C---------------------------------------------------------------------------------
+C7A------WHEN CONNECTIVITY IS EXPANDED, THEN SAVE BASIC SUBSURFACE DOMAIN IA IN IAG
+C7A------(CONNECTIVITY IS EXPANDED WHEN OTHER PROCESS DOMAINS EXIST OR IF GNC IS USED)
+      IF(INCLN.NE.0.OR.INGNC.NE.0.OR.INGNC2.NE.0.OR.INGNCn.NE.0) THEN
+        ALLOCATE(IAG(NODES+1))
+        DO I=1,NODES+1
+          IAG(I) = IA(I)
+        ENDDO
+C7A1------ALSO ALLOCATE SPACE FOR ORIGINAL JA REQUIRED TO SORT C-B-C OUTPUT
+        ALLOCATE (JAFL(NJA+1))
+        DO I=1,NJA
+          JAFL(I) = JA(I)
+        ENDDO
+C---------------------------------------------------------------------------------
+C7B-------INITIALIZE SPARSEMODULE DATA STRUCTURES FOR CREATING NEW IA AND JA
+        ALLOCATE(ROWMAXNNZ(NEQS))
+C7B1--------STORE NUMBER OF CONNECTIONS IN ROWMAXNNZ TO INITIALIZE AMAT SIZE
+        DO N=1,NODES
+          ROWMAXNNZ(N)=IA(N+1)-IA(N)
+        ENDDO
+C7B2--------ALSO FOR CLN NODES
+        IF(INCLN.NE.0) THEN
+        DO N=1,NCLNNDS
+          IEQ = N + NODES
+          ROWMAXNNZ(IEQ)=IA_CLN(N+1)-IA_CLN(N)
+        ENDDO
+        ENDIF
+        CALL SMAT%INIT(NEQS, NEQS, ROWMAXNNZ)
+        DEALLOCATE(ROWMAXNNZ)
+C7B3--------ADD EXISTING GW IA/JA PATTERN TO SPARSEMODULE DATA STRUCTURE
+        DO N=1,NEQS
+          DO JJ=IA(N),IA(N+1)-1
+              M=JA(JJ)
+              CALL SMAT%ADDCONNECTION(N,M,1)
+          ENDDO
+        ENDDO
+C7B4-----DEALLOCATE THE JA ARRAY
+        DEALLOCATE(JA)
+C--------------------------------------------------------------------
+C7C-------IF CLN DOMAIN IS ACTIVE THEN ADD ITS NODES TO THE SPARSEMODULE DATA STRUCTURE
+        IF(INCLN.NE.0) THEN
+          CALL ADDIAJA_CLN (SMAT)
+        ENDIF
+C---------------------------------------------------------------------------------
+C7D-------IF GNC DOMAIN IS ACTIVE THEN ADD ITS CONNECTIONS TO IA AND JA
+csp        IF(INGNC.NE.0) THEN
+csp          CALL ADDIAJA_GNC
+csp        ENDIF
+csp        IF(INGNC2.NE.0) THEN
+csp          CALL ADDIAJA_GNCT
+csp        ENDIF
+        IF(INGNCn.NE.0) THEN
+          CALL ADDIAJA_GNCn (SMAT)
+        ENDIF
+C------------------------------------------------------------------------------------
+C7E------ALLOCATE JA AND FILL THE IA AND JA ARRAYS AFTER ALL SPARSEMODULE DATA STRUCTURES ARE FILLED
+        NJA=SMAT%NNZ
+        ALLOCATE(JA(NJA))
+        CALL SMAT%FILLIAJA(IA,JA,IERR)
+C
+C7F------DESTROY THE SPARSEROW MATRIX
+        CALL SMAT%DESTROY
+C--------------------------------------------------------------------------------
+C7G-------PRINT NEW IA AND JA INFORMATION IF PRINTFV OPTION IS SET
+        IF(IPRCONN.NE.0)THEN
+          WRITE(IOUT,54)NEQS,NJA
+54        FORMAT(1X,'NEQS = ',I10,';  NJA = ',I10,';')
+          WRITE(IOUT,*)'IA IS BELOW, 40I10'
+          WRITE(IOUT,55)(IA(I),I=1,NEQS+1)
+          WRITE(IOUT,*)'JA IS BELOW, 40I10'
+          WRITE(IOUT,55)(JA(J),J=1,NJA)
+55        FORMAT(40I10)
+        ENDIF
+      ELSE
+        JAFL => JA
+      ENDIF
+C--------------------------------------------------------------------------
+C7H------PREPARE IDXGLO ARRAY FOR CLN DOMAIN
+      IF(INCLN.NE.0)THEN
+        CALL FILLIDXGLO_CLN
+      ENDIF
+C--------------------------------------------------------------------------
+C7I------PREPARE AND STORE ALPHA_BAR IN COEFFICIENT LOCATION IF ALPHA IS READ.
+C7I------ALSO FIND AND STORE LOCATION OF NODE J IN ROWS N AND M.
+      IF(INGNCn.NE.0) THEN
+        CALL SGNCn2DISU1MC
+      ENDIF
+C---------------------------------------------------------------------------------
+C-------MAKE DIAGONALS OF JA POSITIVE  ***** SHOULD ALREADY BE POSITIVE.
+C      DO N=1,NODES
+C        IDIAG = IA(N)
+C        JA(IDIAG) = IABS (JA(IDIAG))
+C      ENDDO
+C
+C8-------ALLOCATE ISYM AND FILL ISYM AND JAS
+      ALLOCATE(ISYM(NJA))
+      CALL FILLISYM
+C9------ALLOCATE SYMMETRIC AND UNSYMMETRIC GLOBAL ARRAYS
+      ALLOCATE(PGF(NJAS),FAHL(NJAS))
+      PGF=0.0
+      FAHL=0.0
+      ALLOCATE(IVC(NJAS))
+      IVC = 0
+      ALLOCATE (AMAT(NJA))
+      AMAT = 0.0
+      IF(NJA.EQ.NJAG)THEN
+        IATMP => IA
+        NJATMP=> NJA
+      ELSE
+        IATMP => IAG
+        NJATMP=> NJAG
+      ENDIF
+C------------------------------------------------------------------------
+C10-----FILL VERTICAL CONNECTION ARRAY IVC.
+      IF(IVSD.LE.0)THEN
+C10A------compute IVC for IVSD. LE. 0
+        DO K=1,NLAY
+          NNDLAY = NODLAY(K)
+          NSTRT = NODLAY(K-1)+1
+          DO N=NSTRT,NNDLAY
+C10A1-----LOOP OVER CONNECTIONS OF NODE N AND FILL
+          DO II = IA(N)+1,IA(N+1)-1
+            JJ = JA(II)
+            IIS = JAS(II)
+            IF(JJ.LE.N.OR.JJ.GT.NODES) CYCLE
+            IF(JJ.GT.NNDLAY)THEN
+              IVC(IIS) = 1  ! LAYER IS BELOW
+            ELSE
+              IVC(IIS) = 0
+            ENDIF
+          ENDDO
+          ENDDO
+        ENDDO
+      ELSE
+C10B----read IVC, for IVSD. GT. 0.
+        CALL U1DINTNJA(IVC,IATMP,ANAME,NJATMP,INDIS,IOUT,IDSYMRD)
+      ENDIF
+C
+C--------------------------------------------------------------------------
+C11------FILL PROPERTIES OF CONNECTIONS IN RESPECTIVE ARRAYS
+C--------------------------------------------------------------------------
+      IF(IUNSTR.EQ.0)THEN
+C11A---FILL GEOMETRIC FACTOR AND PL, CL1, CL2 ARRAYS FOR STRUCTURED GRID
+        CALL FILLGFS(IOUT)
+      ELSE
+C11B---READ PL, CL1, CL2 ARRAYS AND FILL GEOMETRIC FACTOR FOR UNSTRUCTURED GRID
+        CALL FILLGFU(INDIS,IOUT)
+      ENDIF
+C
+C------------------------------------------------------------------------
+C12-----READ AND WRITE LENGTH OF STRESS PERIOD, NUMBER OF TIME STEPS,
+C12-----TIME STEP MULTIPLIER, AND STEADY-STATE FLAG..
+      WRITE(IOUT,161)
+  161 FORMAT(1X,//1X,'STRESS PERIOD     LENGTH       TIME STEPS',
+     1            '     MULTIPLIER FOR DELT    SS FLAG',/1X,76('-'))
+      ISS=0
+      ITR=0
+      ALLOCATE(STORFRAC(NPER))
+      DO 200 N=1,NPER
+      READ(INDIS,'(A)') LINE
+      LLOC=1
+      CALL URWORD8(LINE,LLOC,ISTART,ISTOP,3,I,PP,IOUT,INDIS)
+      PERLEN(N) = PP
+      CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,NSTP(N),R,IOUT,INDIS)
+      CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,TSMULT(N),IOUT,INDIS)
+      CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,I,R,IOUT,INDIS)
+      STORFRAC(N) = -1.0
+      IF (LINE(ISTART:ISTOP).EQ.'TR') THEN
+         ISSFLG(N)=0
+         ITR=1
+        WRITE(IOUT,163) N,PERLEN(N),NSTP(N),TSMULT(N),LINE(ISTART:ISTOP)
+      ELSE IF (LINE(ISTART:ISTOP).EQ.'SS') THEN
+         ISSFLG(N)=1
+         ISS=1
+        WRITE(IOUT,163) N,PERLEN(N),NSTP(N),TSMULT(N),LINE(ISTART:ISTOP)
+      ELSE IF (LINE(ISTART:ISTOP).EQ.'TRTOSS') THEN 
+         ISSFLG(N)=0 
+         ISTARTKP = ISTART
+         ISTOPKP = ISTOP
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,STOFRAC,IOUT,INDIS)
+         STORFRAC(N) = STOFRAC 
+         WRITE(IOUT,263) N,PERLEN(N),NSTP(N),TSMULT(N),
+     1   LINE(ISTARTKP:ISTOPKP), STOFRAC
+      ELSE
+         WRITE(IOUT,162)
+  162    FORMAT(' SSFLAG MUST BE EITHER "SS", "TR", OR',
+     1    ' TRTOSS -- STOP EXECUTION (SGWF2BAS7U1ARDIS)')
+         CALL USTOP(' ')
+      END IF
+  163 FORMAT(1X,I8,1PG21.7,I7,0PF25.3,A11)
+  263 FORMAT(1X,I8,1PG21.7,I7,0PF25.3,A11,' STORAGE FRACTION =', E12.4)
+C
+C13-----STOP IF NSTP LE 0, PERLEN EQ 0 FOR TRANSIENT STRESS PERIODS,
+C13-----TSMULT LE 0, OR PERLEN LT 0..
+      IF(NSTP(N).LE.0) THEN
+         WRITE(IOUT,164)
+  164    FORMAT(1X,/1X,
+     1  'THERE MUST BE AT LEAST ONE TIME STEP IN EVERY STRESS PERIOD')
+         CALL USTOP(' ')
+      END IF
+      ZERO=0.
+      IF(PERLEN(N).EQ.ZERO .AND. ISSFLG(N).EQ.0) THEN
+         WRITE(IOUT,165)
+  165    FORMAT(1X,/1X,
+     1  'PERLEN MUST NOT BE 0.0 FOR TRANSIENT STRESS PERIODS')
+         CALL USTOP(' ')
+      END IF
+      IF(TSMULT(N).LE.ZERO) THEN
+         WRITE(IOUT,170)
+  170    FORMAT(1X,/1X,'TSMULT MUST BE GREATER THAN 0.0')
+         CALL USTOP(' ')
+      END IF
+      IF(PERLEN(N).LT.ZERO) THEN
+         WRITE(IOUT,175)
+  175    FORMAT(1X,/1X,
+     1  'PERLEN CANNOT BE LESS THAN 0.0 FOR ANY STRESS PERIOD')
+         CALL USTOP(' ')
+      END IF
+  200 CONTINUE
+C
+C14-----Assign ITRSS.
+      IF(ISS.EQ.0 .AND. ITR.NE.0) THEN
+         ITRSS=1
+         WRITE(IOUT,270)
+  270    FORMAT(/,1X,'TRANSIENT SIMULATION')
+      ELSE IF(ISS.NE.0 .AND. ITR.EQ.0) THEN
+         ITRSS=0
+         WRITE(IOUT,275)
+  275    FORMAT(/,1X,'STEADY-STATE SIMULATION')
+      ELSE
+         ITRSS=-1
+         WRITE(IOUT,280)
+  280    FORMAT(/,1X,'COMBINED STEADY-STATE AND TRANSIENT SIMULATION')
+      END IF
+C
+        ALLOCATE(IA2(NEQS+1))
+        ALLOCATE(IA1IA2(NEQS))
+        ALLOCATE(JA2(NJA))
+        ALLOCATE(JA1JA2(NJA))
+C
+C15-----RETURN.
+      RETURN
+      END
+C---------------------------------------------------------------------
+      SUBROUTINE FILLISYM
+C     ******************************************************************
+C     FIND SYMMETRIC LOCATION OF CONNECTIVITY MATRIX AND FILL ISYM.
+C     ALSO FILL  JAS SYMMETRIC STORAGE POINTER ARRAY
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY:  NODES,IA,JA,NJA,ISYM,NEQS,JAS,NJAS,IOUT
+      LOGICAL :: FOUND
+C
+C1------FILL SYMMETRIC LOCATION INDEX ARRAY ISYM
+      NASYM=0
+      DO I=1,NEQS
+          if(i.eq.10026.OR.I.EQ.10025)then
+              yo=1
+          endif
+        DO II=IA(I),IA(I+1)-1
+          J = JA(II)
+          IF(J.NE.I)THEN !FIND LOCATION OF I IN ROW J
+            FOUND = .FALSE.
+            DO JJ=IA(J),IA(J+1)-1
+              IF(JA(JJ).EQ.I)THEN !FOUND LOCATION
+                ILOC = JJ
+                ISYM(II) = ILOC
+                FOUND = .TRUE.
+                EXIT
+              ENDIF
+            ENDDO
+            IF(.NOT. FOUND) THEN
+              WRITE (IOUT,'(A,I0,A,I0,A)') 'NODE ',I,' CONNECTED TO ',J,
+     *          ' BUT NO SYMMETRIC CONNECTION'
+              NASYM = NASYM + 1
+            ENDIF
+          ENDIF
+        ENDDO
+      ENDDO
+      IF(NASYM.GT.0) THEN
+        WRITE(IOUT,'(A,A,I0,A)') 'ERROR. JA IS NOT SYMMETRIC.',
+     1     ' FOUND ',NASYM,' ASYMMETRIC CONNECTIONS.'
+        CALL USTOP ('')
+      ENDIF
+C2------ALLOCATE SYMMETRIC INDEX POINTER ARRAY JAS
+      ALLOCATE(NJAS)
+      NJAS = (NJA-NEQS) / 2
+      ALLOCATE(JAS(NJA))
+C3------FILL JAS WITH LOCATION VARIABLE IN SYMMETRIC ARRAY
+      JAS = 0
+C3A-----FIRST FILL UPPER TRIANGLE LOCATION IN JAS
+      ILOC = 1
+      DO N=1,NEQS
+        DO II=IA(N)+1,IA(N+1)-1
+          J = JA(II)
+          IF(J.GT.N)THEN
+            JAS(II) = ILOC
+            ILOC = ILOC + 1
+          ENDIF
+        ENDDO
+      ENDDO
+C3B-------NEXT FILL LOWER TRIANGLE LOCATION AS REFLECTION
+      DO N=1,NEQS
+        DO II=IA(N),IA(N+1)-1
+          J = JA(II)
+          IF(J.LT.N)THEN
+            JAS(II) = JAS(ISYM(II))
+          ENDIF
+        ENDDO
+      ENDDO
+C
+C4-------RETURN.
+      RETURN
+      END
+C----------------------------------------------------------------------
+      SUBROUTINE SGWF2BAS7I(NLAY,INOC,IOUT,IFREFM,NIUNIT,ITRUNIT,ICUNIT)
+C     ******************************************************************
+C     SET UP OUTPUT CONTROL.
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY: ITRNSP,NSTP,ISSFLG,NPER,INCLN,IDPF,IDPT,IUNIT,
+     1     NODES, NEQS 
+      USE GWFBASMODULE, ONLY: IHEDFM,IDDNFM,IHEDUN,IDDNUN,IPEROC,ITSOC,
+     1    CHEDFM,CDDNFM,IBDOPT,LBHDSV,LBDDSV,IBOUUN,LBBOSV,CBOUFM,
+     3    IAUXSV,IOFLG,VBVL,VBNM,ISPCFM,ISPCUN,CSPCFM,IATS,NPTIMES,
+     4    NPSTPS,DELTAT,TMINAT,TMAXAT,TADJAT,TCUTAT,IBUDFLAT,ICBCFLAT,
+     5    IHDDFLAT,IDDREF,IDDREFNEW,ISPCFLAT,IUDFAST,IUDFASTC,
+     6    IFAST,ISPFAST,ITSFAST,IUGFAST,IUCFAST,IFASTH,
+     7    IFASTC,ISPFASTC,ITSFASTC,IUGFASTC,IUCFASTC,IUMFASTC,
+     8    IUGBOOT,IUCBOOT,IUDBOOT,IBOOT,
+     9    BOOTSCALE,BOOTSLOPE,IBOOTSCALE,DTBOOTSCALE,HREADBOOT 
+      USE CLN1MODULE, ONLY: ICLNHD, ICLNDD, ICLNIB,ICLNCN
+      CHARACTER*400 LINE
+C     ------------------------------------------------------------------
+C
+C1-----ALLOCATE SPACE FOR IOFLG, VBVL, AND VBNM ARRAYS.
+      ALLOCATE (IOFLG(NLAY,7))
+      ALLOCATE (VBVL(4,NIUNIT))
+      ALLOCATE (VBNM(NIUNIT))
+      IDDREF=0
+      IDDREFNEW=0
+C
+C1A------ASSIGN DEFAULT VALUES.
+      CHEDFM=' '
+      CDDNFM=' '
+      CSPCFM=' '
+      CBOUFM='(20I4)'
+      IHEDFM=0
+      IDDNFM=0
+      ISPCFM=0
+      IHEDUN=0
+      IDDNUN=0
+      ISPCUN=0
+      IBOUUN=0
+      IBDOPT=1
+      LBHDSV=0
+      LBDDSV=0
+      LBBOSV=0
+      IAUXSV=0
+C
+C2------TEST OUTPUT CONTROL INPUT UNIT TO SEE IF OUTPUT CONTROL IS
+C2------ACTIVE.
+      IF(INOC.LE.0) THEN
+C
+C2A-----OUTPUT CONTROL IS INACTIVE. PRINT A MESSAGE LISTING DEFAULTS.
+         WRITE(IOUT, 41)
+   41    FORMAT(1X,/1X,'DEFAULT OUTPUT CONTROL',/1X,
+     1   'THE FOLLOWING OUTPUT COMES AT THE END OF EACH STRESS PERIOD:')
+         WRITE(IOUT, 42)
+   42    FORMAT(1X,'TOTAL VOLUMETRIC BUDGET')
+         WRITE(IOUT, 43)
+   43    FORMAT(1X,10X,'HEAD')
+C
+C2B-----SET DEFAULT FLAGS IN IOFLG SO THAT HEAD IS PRINTED FOR
+C2B-----EVERY LAYER.
+         DO 80 K=1,NLAY
+         IOFLG(K,1)=1
+         IOFLG(K,2)=0
+         IOFLG(K,3)=0
+         IOFLG(K,4)=0
+         IOFLG(K,5)=0
+         IOFLG(K,6)=0
+         IOFLG(K,7)=0
+   80    CONTINUE
+         GO TO 1000
+      END IF
+C
+C3------OUTPUT CONTROL IS ACTIVE.  READ FIRST RECORD AND DECODE FIRST
+C3------WORD.  MUST USE URWORD IN CASE FIRST WORD IS ALPHABETIC.
+      CALL URDCOM(INOC,IOUT,LINE)
+C--------------------------------------------------------------------------------
+C3A------CHECK FOR OPTIONS
+      ALLOCATE(IATS,NPTIMES,NPSTPS,IBUDFLAT,ICBCFLAT,IHDDFLAT,ISPCFLAT)
+      ALLOCATE(DELTAT,TMINAT,TMAXAT,TADJAT,TCUTAT)
+      ALLOCATE(IFAST,ISPFAST,ITSFAST,IUGFAST,IUCFAST,IFASTH)
+      ALLOCATE(IFASTC,ISPFASTC,ITSFASTC,IUGFASTC,IUCFASTC,IUMFASTC,
+     1   IUDFAST,IUDFASTC)
+      ALLOCATE (IUGBOOT,IUCBOOT,IUDBOOT,IBOOT,IBOOTSCALE)
+      ALLOCATE (DTBOOTSCALE)      
+      IATS=0
+      NPTIMES=0
+      NPSTPS=0
+c-----initialize booting option flags      
+      IUGBOOT = 0
+      IUCBOOT = 0
+      IUDBOOT = 0
+      IBOOT = 0
+      IBOOTSCALE = 0      
+c-----initialize fastforward option flags
+      IFAST=0
+      IFASTH=0
+      IFASTC=0
+      ISPFAST=0
+      ITSFAST=0
+      IUGFAST=0
+      IUCFAST=0
+      IUDFAST = 0
+C
+      ISPFASTC=0
+      ITSFASTC=0
+      IUGFASTC=0
+      IUCFASTC=0
+      IUDFASTC = 0
+      IUMFASTC = 0
+c
+      LLOC = 1
+   10 CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,IN)
+      IF(LINE(ISTART:ISTOP).EQ.'ATS'.OR.
+     1   LINE(ISTART:ISTOP).EQ.'ATSA') THEN
+C3B------READ KEYWORD OPTION ATS FOR ADAPTIVE TIME STEPPING.
+         IATS = 1
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'NPTIMES') THEN
+C3C------IS KEWORD OPTION FOR NUMBER OF PRINT TIMES
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,NPTIMES,R,IOUT,INOC)
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'NPSTPS') THEN
+C3C------IS KEWORD OPTION FOR NUMBER OF PRINT TIMES
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,NPSTPS,R,IOUT,INOC)
+        WRITE(IOUT,14) NPSTPS
+14      FORMAT(/1X,'OUTPUT PROVIDED EVERY', I9,' TIME STEPS (NPSTPS)')
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'FASTFORWARD') THEN
+        IFAST = 1
+        IFASTH = 1
+C3C------IS KEWORD OPTION FOR FASTFORWARD FROM SEPARATE FILE
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,ISPFAST,R,IOUT,INOC)
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,ITSFAST,R,IOUT,INOC)
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IUGFAST,R,IOUT,INOC)
+        WRITE(IOUT,15) ISPFAST,ITSFAST,IUGFAST
+15      FORMAT(/1X,'FASTFORWARDING TO STRESS PERIOD,',I10,
+     1    ' AND TIME-STEP',I10
+     1     /10X,'READING FASTFORWARD GWF HEADS FROM UNIT',I5)
+        IF(INCLN.GT.0)THEN
+          CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IUCFAST,R,IOUT,INOC)
+          WRITE(IOUT,16) IUCFAST
+16        FORMAT(10X,'READING FASTFORWARD CLN HEADS FROM UNIT',I5)
+        ENDIF
+        IF(IDPF.GT.0)THEN
+          CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IUDFAST,R,IOUT,INOC)
+          WRITE(IOUT,17) IUDFAST
+17        FORMAT(10X,'READING FASTFORWARD DDF HEADS FROM UNIT',I5)
+        ENDIF
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'FASTFORWARDC') THEN
+        IFAST = 1
+        IFASTC = 1
+C3C------IS KEWORD OPTION FOR FASTFORWARD OF CONC FROM SEPARATE FILE
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,ISPFASTC,R,IOUT,INOC)
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,ITSFASTC,R,IOUT,INOC)
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IUGFASTC,R,IOUT,INOC)
+        WRITE(IOUT,25) ISPFASTC,ITSFASTC,IUGFASTC
+25      FORMAT(/1X,'FASTFORWARDING TO STRESS PERIOD,',I10,
+     1    ' AND TIME-STEP',I10
+     1     /10X,'READING FASTFORWARD GWF CONC FROM UNIT',I5)
+        IF(INCLN.GT.0)THEN
+          CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IUCFASTC,R,IOUT,INOC)
+          WRITE(IOUT,26) IUCFASTC
+26        FORMAT(10X,'READING FASTFORWARD CLN CONC FROM UNIT',I5)
+        ENDIF
+        IF(IUNIT(30).GT.0)THEN
+          CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IUDFASTC,R,IOUT,INOC)
+          WRITE(IOUT,27) IUDFASTC
+27        FORMAT(10X,'READING FASTFORWARD DDT CONCS FROM UNIT',I5)
+        ENDIF
+C        IF(ImdT.GT.0)THEN
+C          CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IUMFASTC,R,IOUT,INOC)
+C          WRITE(IOUT,28) IUMFASTC
+C28        FORMAT(10X,'READING FASTFORWARD MATRIX CONCS FROM UNIT',I5)
+C        ENDIF
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'BOOTSTRAPPING') THEN
+C3C------IS KEWORD OPTION FOR BOOTSTRAPPING THE NEW ESTIMATE FOR HEAD AT FIRST ITERATION FROM SEPARATE FILE 
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IUGBOOT,R,IOUT,INOC) 
+        WRITE(IOUT,29) IUGBOOT
+29      FORMAT(/1X,'BOOTSTRAPPING IS DONE FOR TRANSIENT SIMULATION,',/
+     1    10X,'READING BOOTSTRAP GWF HEADS FROM UNIT',I5)  
+        IF(INCLN.GT.0)THEN
+          CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IUCBOOT,R,IOUT,INOC)
+          WRITE(IOUT,30) IUCBOOT
+30        FORMAT(10X,'READING BOOTSTRAP CLN HEADS FROM UNIT',I5)
+        ENDIF
+        IF(IUNIT(30).GT.0)THEN
+          CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IUDBOOT,R,IOUT,INOC)
+          WRITE(IOUT,31) IUDBOOT
+31        FORMAT(10X,'READING BOOTSTRAP DDF HEADS FROM UNIT',I5)
+        ENDIF
+      END IF
+C
+      IF(LLOC.LT.200) GO TO 10
+C      
+C-------ALLOCATE SPACE FOR BOOTSTRAPING ARRAYS
+      IF(IUGBOOT.NE.0)THEN
+        ALLOCATE (BOOTSCALE(NEQS),BOOTSLOPE(NEQS),HREADBOOT(NEQS))
+        BOOTSCALE = 1.0
+      ENDIF     
+C-------SET DEFAULTS FOR ADAPTIVE TIME STEPPING
+      IF(NPSTPS.GT.0.OR.NPTIMES.GT.0) IATS=1
+      IF(NPSTPS.EQ.0) NPSTPS=100000000
+      IF(IATS.EQ.1)THEN
+        WRITE(IOUT,13)
+   13   FORMAT(/1X,'ADAPTIVE TIME STEPPING PERFORMED. ATS',
+     1      ' VARIABLES WILL BE READ.'/1X,61('-'))
+        DO K=1,NPER
+          IF(ISSFLG(K).EQ.1.AND.ITRUNIT.EQ.0) THEN
+            NSTP(K) = 1
+          ELSE
+            NSTP(K) = 1000000
+          ENDIF
+        ENDDO
+        DELTAT = 1.0
+        TMINAT = 1.0E-10
+        TMAXAT = 1.0E10
+        TADJAT = 2.0
+        TCUTAT = 5.0
+      ENDIF
+C------------------------------------------------------------------------------
+      LLOC=1
+      CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+C
+C4------TEST FOR NUMERIC OUTPUT CONTROL.  FIRST WORD WILL NOT BE
+C4------"PERIOD", "HEAD", "DRAWDOWN", OR "COMPACT" OR CONC OR CONCENTRATION.
+      IF(LINE(ISTART:ISTOP).NE.'PERIOD' .AND. LINE(ISTART:ISTOP).NE.
+     1     'HEAD' .AND. LINE(ISTART:ISTOP).NE.'DRAWDOWN' .AND.
+     2     LINE(ISTART:ISTOP).NE.'COMPACT' .AND.
+     3     LINE(ISTART:ISTOP).NE.'IBOUND'.AND.
+     3     LINE(ISTART:ISTOP).NE.'CONC'.AND.
+     3     LINE(ISTART:ISTOP).NE.'CONCENTRATION'.AND.
+     3     LINE(ISTART:ISTOP).NE.'FASTFORWARD'.AND.
+     3     LINE(ISTART:ISTOP).NE.'FASTFORWARDC'.AND.
+     3     LINE(ISTART:ISTOP).NE.'BOOTSTRAPPING'.AND.      
+     4     LINE(ISTART:ISTOP).NE.'ATSA') THEN
+C4A-----NUMERIC OUTPUT CONTROL.  DECODE THE INITIAL RECORD ACCORDINGLY.
+         WRITE(IOUT,102)
+  102    FORMAT(1X,/1X,'OUTPUT CONTROL IS SPECIFIED EVERY TIME STEP')
+         IF(ITRUNIT.EQ.0)THEN
+           IF(IFREFM.EQ.0) THEN
+              READ(LINE,'(4I10)') IHEDFM,IDDNFM,IHEDUN,IDDNUN
+           ELSE
+              LLOC=1
+              CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IHEDFM,R,IOUT,INOC)
+              CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IDDNFM,R,IOUT,INOC)
+              CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IHEDUN,R,IOUT,INOC)
+              CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IDDNUN,R,IOUT,INOC)
+           END IF
+           WRITE(IOUT,103) IHEDFM,IDDNFM
+  103     FORMAT(1X,'HEAD PRINT FORMAT CODE IS',I4,
+     1       '    DRAWDOWN PRINT FORMAT CODE IS',I4)
+           WRITE(IOUT,104) IHEDUN,IDDNUN
+  104      FORMAT(1X,'HEADS WILL BE SAVED ON UNIT ',I4,
+     1       '    DRAWDOWNS WILL BE SAVED ON UNIT ',I4)
+         ELSE
+           IF(IFREFM.EQ.0) THEN
+            READ(LINE,'(6I10)')IHEDFM,IDDNFM,IHEDUN,IDDNUN,ISPCFM,ISPCUN
+           ELSE
+              LLOC=1
+              CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IHEDFM,R,IOUT,INOC)
+              CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IDDNFM,R,IOUT,INOC)
+              CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IHEDUN,R,IOUT,INOC)
+              CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IDDNUN,R,IOUT,INOC)
+              CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,ISPCFM,R,IOUT,INOC)
+              CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,ISPCUN,R,IOUT,INOC)
+           END IF
+           WRITE(IOUT,113) IHEDFM,IDDNFM,ISPCFM
+  113     FORMAT(1X,'HEAD PRINT FORMAT CODE IS',I4,
+     1       '    DRAWDOWN PRINT FORMAT CODE IS',I4,
+     1       '        CONC PRINT FORMAT CODE IS',I4)
+           WRITE(IOUT,114) IHEDUN,IDDNUN,ISPCUN
+  114      FORMAT(1X,'HEADS WILL BE SAVED ON UNIT ',I4,
+     1       '    DRAWDOWNS WILL BE SAVED ON UNIT ',I4,
+     1       '         CONC WILL BE SAVED ON UNIT ',I4)
+         ENDIF
+         IPEROC=-1
+         ITSOC=-1
+C4B---READ OUTPUT TIME SERIES VECTOR
+         IF(NPTIMES.GT.0) CALL PTIMES1RP(INOC,IOUT)
+      ELSE
+C----------------------------------------------------------------------------------------
+C4C---FOR ALPHABETIC OC, READ OUTPUT TIME SERIES VECTOR FIRST
+         IF(NPTIMES.GT.0) CALL PTIMES1RP(INOC,IOUT)
+C4D-----ALPHABETIC OUTPUT CONTROL.  CALL MODULE TO READ INITIAL RECORDS.
+         CALL SGWF2BAS7J(INOC,IOUT,LINE,LLOC,ISTART,ISTOP)
+      ENDIF
+      IF(ICUNIT.GT.0) THEN
+      IF(ICLNHD.LT.0) ICLNHD = IHEDUN
+      IF(ICLNDD.LT.0) ICLNDD = IDDNUN
+      IF(ICLNIB.LT.0) ICLNIB = IBOUUN
+      IF(ICLNCN.LT.0) ICLNCN = ISPCUN
+      ENDIF
+C
+C5------RETURN.
+ 1000 RETURN
+      END
+      SUBROUTINE PTIMES1RP(INOC,IOUT)
+C     ******************************************************************
+C     READ PRINT TIME ARRAY.
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY: NSTP
+      USE GWFBASMODULE, ONLY: TIMOT,ITIMOT,TIMOTC,ITIMOTC,DELTAT,
+     1    TMINAT,TMAXAT,TADJAT,TCUTAT,NPTIMES,NPSTPS
+C
+      CHARACTER*400 LINE
+C     ------------------------------------------------------------------
+C
+C1------READ PRINT TIME ARRAY
+      ALLOCATE(TIMOT(NPTIMES+1),TIMOTC(NPTIMES+1))
+      ALLOCATE(ITIMOT,ITIMOTC)
+      ITIMOT=1
+      ITIMOTC = 1   ! USE SEPARATE INDEX AND ARRAY FOR CONCENTRATIONS
+C
+      WRITE(IOUT,11)NPTIMES
+11    FORMAT(/10X,  'OUTPUT WILL BE PRINTED AT FOLLOWING',I8,' TIMES'/
+     1        10X,  50('-'))
+C
+      READ(INOC,*) (TIMOT(IT),IT=1,NPTIMES)
+      WRITE(IOUT,'(10(1PG15.7))') (TIMOT(IT),IT=1,NPTIMES)
+      TIMOT(NPTIMES+1) = 1.0E20
+C2------PERFORM CONSISTENCY CHECKS
+      DO IT=1,NPTIMES-1
+        IF(TIMOT(IT+1)-TIMOT(IT).LE.TMINAT) THEN
+          WRITE(IOUT,12)
+12        FORMAT( 'PRINT TIMES ARE NOT SEQUENTIALLY INCREASING',
+     1    ' OR ARE LESS THAN TMINAT APART')
+          STOP
+        ENDIF
+      ENDDO
+C3 ---FILL TIMOTC WITH TIMOT FOR TRANSPORT      
+      DO I = 1,NPTIMES+1
+        TIMOTC(I) = TIMOT(I)
+      ENDDO
+C
+C4------RETURN.
+ 1000 RETURN
+      END
+      SUBROUTINE SGWF2BAS7J(INOC,IOUT,LINE,LLOC,ISTART,ISTOP)
+C     ******************************************************************
+C     READ INITIAL ALPHABETIC OUTPUT CONTROL RECORDS.
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY: ITRNSP
+      USE GWFBASMODULE, ONLY: IHEDFM,IDDNFM,IHEDUN,IDDNUN,IPEROC,ITSOC,
+     1                CHEDFM,CDDNFM,IBDOPT,LBHDSV,LBDDSV,IATS,IDDREFNEW,
+     2                IBOUUN,LBBOSV,CBOUFM,IAUXSV,ISPCFM,ISPCUN,CSPCFM
+C
+      CHARACTER*400 LINE
+C     ------------------------------------------------------------------
+C
+C1------ALPHABETIC OUTPUT CONTROL.  WRITE MESSAGE AND SET INITIAL VALUES
+C1------FOR IPEROC AND ITSOC.
+      WRITE(IOUT,91)
+   91 FORMAT(1X,/1X,'OUTPUT CONTROL IS SPECIFIED ONLY AT TIME STEPS',
+     1    ' FOR WHICH OUTPUT IS DESIRED')
+      IPEROC=9999
+      ITSOC=9999
+C
+C2------LOOK FOR ALPHABETIC WORDS:
+C2A-----LOOK FOR "PERIOD", WHICH INDICATES THE END OF INITIAL OUTPUT
+C2A-----CONTROL DATA.  IF FOUND, DECODE THE PERIOD NUMBER AND TIME
+C2A-----STEP NUMBER FOR LATER USE.
+  100 IF(LINE(ISTART:ISTOP).EQ.'PERIOD') THEN
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IPEROC,R,IOUT,INOC)
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+C2Ai-------SKIP TIME STEP IF ADAPTIVE TIME STEPPING
+         IF(IATS.NE.0) GO TO 20
+         IF(LINE(ISTART:ISTOP).NE.'STEP') GO TO 2000
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,ITSOC,R,IOUT,INOC)
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+20       CONTINUE
+         IF(ITRNSP.EQ.0)THEN
+           WRITE(IOUT,101) IHEDFM,IDDNFM
+  101      FORMAT(1X,'HEAD PRINT FORMAT CODE IS',I4,
+     1          '    DRAWDOWN PRINT FORMAT CODE IS',I4)
+           WRITE(IOUT,102) IHEDUN,IDDNUN
+  102      FORMAT(1X,'HEADS WILL BE SAVED ON UNIT ',I4,
+     1          '    DRAWDOWNS WILL BE SAVED ON UNIT ',I4)
+         ELSE
+           WRITE(IOUT,113) IHEDFM,IDDNFM,ISPCFM
+  113      FORMAT(1X,'HEAD PRINT FORMAT CODE IS',I4,
+     1          '    DRAWDOWN PRINT FORMAT CODE IS',I4,
+     2          '        CONC PRINT FORMAT CODE IS',I4)
+           WRITE(IOUT,122) IHEDUN,IDDNUN,ISPCUN
+  122      FORMAT(1X,'HEADS WILL BE SAVED ON UNIT ',I4,
+     1          '    DRAWDOWNS WILL BE SAVED ON UNIT ',I4,
+     2          '        CONCS WILL BE SAVED ON UNIT ',I4)
+         ENDIF
+C2Aii------READ DDREFERENCE FLAG
+         IF(LINE(ISTART:ISTOP).EQ.'DDREFERENCE') THEN
+           IDDREFNEW=1
+         ELSE
+           IDDREFNEW=0
+         END IF
+C
+         GO TO 1000
+C
+C2B-----LOOK FOR "HEAD PRINT ..." AND "HEAD SAVE ...".  IF
+C2B-----FOUND, SET APPROPRIATE FLAGS.
+      ELSE IF(LINE(ISTART:ISTOP).EQ.'HEAD') THEN
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+         IF(LINE(ISTART:ISTOP).EQ.'PRINT') THEN
+            CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+            IF(LINE(ISTART:ISTOP).NE.'FORMAT') GO TO 2000
+            CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IHEDFM,R,IOUT,INOC)
+         ELSE IF(LINE(ISTART:ISTOP).EQ.'SAVE') THEN
+            CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+            IF(LINE(ISTART:ISTOP).EQ.'UNIT') THEN
+               CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IHEDUN,R,IOUT,
+     1            INOC)
+            ELSE IF(LINE(ISTART:ISTOP).EQ.'FORMAT') THEN
+               CALL URWORD(LINE,LLOC,ISTART,ISTOP,0,N,R,IOUT,INOC)
+               CHEDFM=LINE(ISTART:ISTOP)
+               WRITE(IOUT,103) CHEDFM
+  103          FORMAT(1X,'HEADS WILL BE SAVED WITH FORMAT: ',A)
+               CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+               IF(LINE(ISTART:ISTOP).EQ.'LABEL') THEN
+                  LBHDSV=1
+                  WRITE(IOUT,104)
+  104             FORMAT(1X,'SAVED HEADS WILL BE LABELED')
+               END IF
+            ELSE
+               GO TO 2000
+            END IF
+         ELSE
+            GO TO 2000
+         END IF
+C
+C2C-----LOOK FOR "DRAWDOWN PRINT ..." AND "DRAWDOWN SAVE ...".
+C2C-----IF FOUND, SET APPROPRIATE FLAGS
+      ELSE IF(LINE(ISTART:ISTOP).EQ.'DRAWDOWN') THEN
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+         IF(LINE(ISTART:ISTOP).EQ.'PRINT') THEN
+            CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+            IF(LINE(ISTART:ISTOP).NE.'FORMAT') GO TO 2000
+            CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IDDNFM,R,IOUT,INOC)
+         ELSE IF(LINE(ISTART:ISTOP).EQ.'SAVE') THEN
+            CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+            IF(LINE(ISTART:ISTOP).EQ.'UNIT') THEN
+               CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IDDNUN,R,IOUT,
+     1                   INOC)
+            ELSE IF(LINE(ISTART:ISTOP).EQ.'FORMAT') THEN
+               CALL URWORD(LINE,LLOC,ISTART,ISTOP,0,N,R,IOUT,INOC)
+               CDDNFM=LINE(ISTART:ISTOP)
+               WRITE(IOUT,105) CDDNFM
+  105          FORMAT(1X,'DRAWDOWN WILL BE SAVED WITH FORMAT: ',A)
+               CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+               IF(LINE(ISTART:ISTOP).EQ.'LABEL') THEN
+                  LBDDSV=1
+                  WRITE(IOUT,106)
+  106             FORMAT(1X,'SAVED DRAWDOWN WILL BE LABELED')
+               END IF
+            ELSE
+               GO TO 2000
+            END IF
+         ELSE
+            GO TO 2000
+         END IF
+C
+C2B-----LOOK FOR "CONC PRINT ..." AND "CONC SAVE ...".  IF
+C2B-----FOUND, SET APPROPRIATE FLAGS.
+      ELSE IF(LINE(ISTART:ISTOP).EQ.'CONC'.OR.LINE(ISTART:ISTOP)
+     1   .EQ.'CONCENTRATION') THEN
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+         IF(LINE(ISTART:ISTOP).EQ.'PRINT') THEN
+            CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+            IF(LINE(ISTART:ISTOP).NE.'FORMAT') GO TO 2000
+            CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,ISPCFM,R,IOUT,INOC)
+         ELSE IF(LINE(ISTART:ISTOP).EQ.'SAVE') THEN
+            CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+            IF(LINE(ISTART:ISTOP).EQ.'UNIT') THEN
+               CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,ISPCUN,R,IOUT,
+     1            INOC)
+            ELSE IF(LINE(ISTART:ISTOP).EQ.'FORMAT') THEN
+               CALL URWORD(LINE,LLOC,ISTART,ISTOP,0,N,R,IOUT,INOC)
+               CSPCFM=LINE(ISTART:ISTOP)
+               WRITE(IOUT,115) CSPCFM
+  115          FORMAT(1X,'CONCS WILL BE SAVED WITH FORMAT: ',A)
+               CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+               IF(LINE(ISTART:ISTOP).EQ.'LABEL') THEN
+                  LBHDSV=1
+                  WRITE(IOUT,116)
+  116             FORMAT(1X,'SAVED CONCS WILL BE LABELED')
+               END IF
+            ELSE
+               GO TO 2000
+            END IF
+         ELSE
+            GO TO 2000
+         END IF
+C
+C2D-----LOOK FOR "COMPACT BUDGET FILES" -- "COMPACT" IS SUFFICIENT.
+C2D-----IF FOUND, SET APPROPRIATE FLAG.
+      ELSE IF(LINE(ISTART:ISTOP).EQ.'COMPACT') THEN
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+         IF(LINE(ISTART:ISTOP).EQ.'BUDGET') THEN
+            IBDOPT=2
+            WRITE(IOUT,107)
+  107       FORMAT(1X,
+     1      'COMPACT CELL-BY-CELL BUDGET FILES WILL BE WRITTEN')
+            CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+            IF(LINE(ISTART:ISTOP).EQ.'AUXILIARY' .OR.
+     1         LINE(ISTART:ISTOP).EQ.'AUX') THEN
+               IAUXSV=1
+               WRITE(IOUT,108)
+  108          FORMAT(1X,
+     1     'AUXILIARY DATA WILL BE SAVED IN CELL-BY-CELL BUDGET FILES')
+            END IF
+         ELSE
+            GO TO 2000
+         END IF
+C
+C2E-----LOOK FOR  "IBOUND SAVE ...".  IF FOUND, SET APPROPRIATE FLAGS.
+      ELSE IF(LINE(ISTART:ISTOP).EQ.'IBOUND') THEN
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+         IF(LINE(ISTART:ISTOP).EQ.'SAVE') THEN
+            CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+            IF(LINE(ISTART:ISTOP).EQ.'UNIT') THEN
+               CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IBOUUN,R,IOUT,
+     1            INOC)
+               WRITE(IOUT,111) IBOUUN
+  111          FORMAT(1X,'IBOUND WILL BE SAVED ON UNIT ',I4)
+            ELSE IF(LINE(ISTART:ISTOP).EQ.'FORMAT') THEN
+               CALL URWORD(LINE,LLOC,ISTART,ISTOP,0,N,R,IOUT,INOC)
+               CBOUFM=LINE(ISTART:ISTOP)
+               WRITE(IOUT,112) CBOUFM
+  112          FORMAT(1X,'IBOUND WILL BE SAVED WITH FORMAT: ',A)
+               CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+               IF(LINE(ISTART:ISTOP).EQ.'LABEL') THEN
+                  LBBOSV=1
+                  WRITE(IOUT,109)
+  109             FORMAT(1X,'SAVED IBOUND WILL BE LABELED')
+               END IF
+            ELSE
+               GO TO 2000
+            END IF
+         ELSE
+            GO TO 2000
+         END IF
+C2F-------FOR ADAPTIVE TIME STEPPING WITH ALPHABTIC INPUT READ NEXT RECORD
+      ELSE IF(LINE(ISTART:ISTOP).EQ.'ATSA') THEN
+            GO TO 110
+      ELSE IF(LINE(ISTART:ISTOP).EQ.'FASTFORWARD') THEN
+            GO TO 110
+      ELSE IF(LINE(ISTART:ISTOP).EQ.'FASTFORWARDC') THEN
+            GO TO 110
+C
+C2F-----ERROR IF UNRECOGNIZED WORD.
+      ELSE
+         GO TO 2000
+      END IF
+C
+C3------FINISHED READING A RECORD.  READ NEXT RECORD, IGNORING BLANK
+C3------LINES.  GO BACK AND DECODE IT.
+  110 READ(INOC,'(A)',END=1000) LINE
+      IF(LINE.EQ.' ') GO TO 110
+      LLOC=1
+      CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+      GO TO 100
+C
+C4------RETURN.
+ 1000 RETURN
+C
+C5------ERROR DECODING INPUT DATA.
+ 2000 WRITE(IOUT,2001) LINE
+ 2001 FORMAT(1X,/1X,'ERROR READING OUTPUT CONTROL INPUT DATA:'/1X,A80)
+      CALL USTOP(' ')
+      END
+      SUBROUTINE SGWF2BAS7U1ARMZ(INZONE,INMULT)
+C     ******************************************************************
+C     ALLOCATE AND READ MULTIPLIER AND ZONE ARRAYS
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL,     ONLY:NCOL,NROW,IOUT,MXNODLAY,IUNSTR
+      USE PARAMMODULE,ONLY:NZONAR,NMLTAR,ZONNAM,MLTNAM,IZON,RMLT
+C
+      CHARACTER*20 RW
+      CHARACTER*1 COP
+      CHARACTER*24 ANAME
+      CHARACTER*10 CTMP1,CTMP2
+      CHARACTER*400 LINE
+C     ------------------------------------------------------------------
+C------SET NROW AND NCOL APPROPRIATELY FOR UNSTRUCTURED GRID
+       IF(IUNSTR.NE.0)THEN
+         NCOL = MXNODLAY
+         NROW = 1
+       ENDIF
+C
+C1------Read Number of Zone Arrays if Zone Option is active.
+      NZONAR=0
+      IF(INZONE.GT.0) THEN
+         WRITE(IOUT,1) INZONE
+    1    FORMAT(1X,/1X,'ZONE OPTION, INPUT READ FROM UNIT ',I4)
+         CALL URDCOM(INZONE,IOUT,LINE)
+         LLOC=1
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,NZONAR,R,IOUT,INZONE)
+         WRITE(IOUT,2) NZONAR
+    2    FORMAT(1X,I5,' ZONE ARRAYS')
+         IF(NZONAR.LT.0) NZONAR=0
+      END IF
+C
+C2------Allocate memory for zone arrays.  Allocate one array element if
+C2------there are no zone arrays.
+      IF(NZONAR.GT.0) THEN
+        ALLOCATE (ZONNAM(NZONAR))
+        ALLOCATE (IZON(NCOL,NROW,NZONAR))
+      ELSE
+        ALLOCATE (ZONNAM(1))
+        ALLOCATE (IZON(1,1,1))
+      ENDIF
+C
+C3------Read Number of Multiplier Arrays if Multiplier Option is active.
+      NMLTAR=0
+      IF(INMULT.GT.0) THEN
+         WRITE(IOUT,11) INMULT
+   11    FORMAT(1X,/1X,'MULTIPLIER OPTION, INPUT READ FROM UNIT ',I4)
+         CALL URDCOM(INMULT,IOUT,LINE)
+         LLOC=1
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,NMLTAR,R,IOUT,INMULT)
+         WRITE(IOUT,12) NMLTAR
+   12    FORMAT(1X,I3,' MULTIPLIER ARRAYS')
+         IF(NMLTAR.LT.0) NMLTAR=0
+      END IF
+C
+C4------Allocate memory for multiplier arrays.  Allocate one array element if
+C4------there are no multiplier arrays.
+      IF(NMLTAR.GT.0) THEN
+        ALLOCATE (MLTNAM(NMLTAR))
+        ALLOCATE (RMLT(NCOL,NROW,NMLTAR))
+      ELSE
+        ALLOCATE (MLTNAM(1))
+        ALLOCATE (RMLT(1,1,1))
+      ENDIF
+C
+C5------Initialize names of zones, multipliers, and parameters.
+      IF(NZONAR.GT.0) THEN
+        DO 10 I=1,NZONAR
+        ZONNAM(I)=' '
+10      CONTINUE
+      END IF
+      IF(NMLTAR.GT.0) THEN
+        DO 20 I=1,NMLTAR
+        MLTNAM(I)=' '
+20      CONTINUE
+      END IF
+C
+C6------Define the multiplier arrays.
+      IF(NMLTAR.GT.0) THEN
+        DO 2000 M=1,NMLTAR
+C
+C6A-----Read a line describing a multiplier array.
+          READ (INMULT,'(A)') LINE
+C
+C6B-----Get the name of the new array
+          LLOC=1
+          CALL URWORD(LINE,LLOC,ISTART,ISTOP,0,N,R,IOUT,INMULT)
+C
+C6C-----Add new multiplier name into list.
+          MLTNAM(M)=LINE(ISTART:ISTOP)
+          CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INMULT)
+          IF(LINE(ISTART:ISTOP).NE.'FUNCTION') THEN
+C
+C6D-----Define array using array reader.
+             ANAME=' MULT. ARRAY: '//MLTNAM(M)
+             CALL U2DREL(RMLT(1,1,M),ANAME,NROW,NCOL,0,INMULT,IOUT)
+          ELSE
+C
+C6E-----Define array as aritmetic combination of other multiplier arrays.
+C6E-----Start by initializing the array to 0.
+             WRITE(IOUT,30) MLTNAM(M)
+   30        FORMAT(1X,/1X,'Calculated multiplier array: ',A)
+             DO 40 I=1,NROW
+             DO 40 J=1,NCOL
+             RMLT(J,I,M)=0.
+   40        CONTINUE
+C
+C6E1----Get the names of the multipliers and the operands.
+             READ (INMULT,'(A)') LINE
+             LLOC=1
+             NOP=0
+C
+C6E2----Get the operator.
+   45        IF(NOP.EQ.0) THEN
+C
+C6E2A---No operator is specified before the first operand -- define it to be " "
+                COP=' '
+             ELSE
+C
+C6E2B---Get the operator that precedes each operand after the first operand.
+                CALL URWORD(LINE,LLOC,ISTART,ISTOP,0,N,R,IOUT,INMULT)
+                IF(LINE(ISTART:ISTOP).EQ.'+' .OR.
+     1             LINE(ISTART:ISTOP).EQ.'-' .OR.
+     2             LINE(ISTART:ISTOP).EQ.'*' .OR.
+     3             LINE(ISTART:ISTOP).EQ.'/') THEN
+                   COP=LINE(ISTART:ISTOP)
+                ELSE
+                   GO TO 1000
+                END IF
+             END IF
+             NOP=NOP+1
+C
+C6E3----Get the operand.
+             CALL URWORD(LINE,LLOC,ISTART,ISTOP,0,N,R,IOUT,INMULT)
+             WRITE(IOUT,47 ) COP,LINE(ISTART:ISTOP)
+   47        FORMAT(1X,'                        ',A,' ARRAY ',A)
+C
+C6E4----Lookup the operand in the list of existing multipliers
+             DO 50 MM=1,M
+               CTMP1=MLTNAM(MM)
+               CALL UPCASE(CTMP1)
+               CTMP2=LINE(ISTART:ISTOP)
+               CALL UPCASE(CTMP2)
+               IF(CTMP1.EQ.CTMP2) GO TO 60
+   50        CONTINUE
+             WRITE(IOUT,51) LINE(ISTART:ISTOP)
+   51        FORMAT(1X,
+     1        'ARRAY OPERAND HAS NOT BEEN PREVIOUSLY DEFINED:',A)
+             CALL USTOP(' ')
+C
+C6E5----Apply the + operator.
+   60        IF(COP.EQ.'+' .OR. COP.EQ.' ') THEN
+                DO 100 I = 1, NROW
+                DO 100 J = 1, NCOL
+                  RMLT(J,I,M) = RMLT(J,I,M)+ RMLT(J,I,MM)
+  100           CONTINUE
+             ELSE IF(COP.EQ.'-') THEN
+                DO 200 I = 1, NROW
+                DO 200 J = 1, NCOL
+                  RMLT(J,I,M) = RMLT(J,I,M)- RMLT(J,I,MM)
+  200           CONTINUE
+             ELSE IF(COP.EQ.'*') THEN
+                DO 300 I = 1, NROW
+                DO 300 J = 1, NCOL
+                  RMLT(J,I,M) = RMLT(J,I,M)* RMLT(J,I,MM)
+  300           CONTINUE
+             ELSE
+                DO 400 I = 1, NROW
+                DO 400 J = 1, NCOL
+                  RMLT(J,I,M) = RMLT(J,I,M)/ RMLT(J,I,MM)
+  400           CONTINUE
+             END IF
+C
+C6E6----Get the next operator.
+             GO TO 45
+C
+C6E7-----Done defining the array.  Get the print code and print the array.
+1000          IPRN=0
+              L=20-ISTOP+ISTART
+              IF(L.GT.1)  THEN
+                 RW=' '
+                 RW(L:20)=LINE(ISTART:ISTOP)
+                 READ(RW,'(I20)',ERR=1200) IPRN
+              END IF
+ 1200         IF(IPRN.GE.0) THEN
+                 ANAME=' MULT. ARRAY: '//MLTNAM(M)
+                 CALL ULAPRWC(RMLT(1,1,M),NCOL,NROW,0,IOUT,IPRN,
+     1                 ANAME)
+              END IF
+          END IF
+ 2000   CONTINUE
+      ENDIF
+C
+C7------Read the zone array names and arrays
+      IF(NZONAR.GT.0) THEN
+         DO 3000 NZ=1,NZONAR
+         READ(INZONE,'(A)') ZONNAM(NZ)
+         CALL U2DINT(IZON(1,1,NZ),'  ZONE ARRAY: '//ZONNAM(NZ),
+     1            NROW,NCOL,0,INZONE,IOUT)
+ 3000    CONTINUE
+      END IF
+C
+C8------Return.
+      RETURN
+      END
+C
+C -----------------------------------------------------------------------
+      SUBROUTINE SGWF2BAS7U1ARPVAL(IUPVAL)
+C     ******************************************************************
+C     READ PARAMETER INPUT FILE
+C     ******************************************************************
+C     SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL,    ONLY: IOUT,IUNIT
+      USE PARAMMODULE, ONLY:MXPAR,IPSUM,PARNAM,B,NPVAL
+C
+      CHARACTER*10 PNI, PNJ
+      CHARACTER*400 LINE
+C     ------------------------------------------------------------------
+C
+C1------CHECK TO SEE IF THE PARAMETER FILE WAS DECLARED IN THE NAME FILE.
+      IU=IUNIT(IUPVAL)
+      IF(IU.LE.0) THEN
+         NPVAL=0
+         RETURN
+      END IF
+C
+C2------INITIALIZE VARIABLES
+      IERR = 0
+      NPE = 0
+C
+C3------IDENTIFY PARAMETER VALUE OPTION.
+      WRITE (IOUT,12) IU
+   12 FORMAT (1X,/,1X,
+     1  'PARAMETER VALUE INPUT FILE,  INPUT READ FROM UNIT ',I4)
+C
+C4------READ & PRINT NUMBER OF PARAMETER VALUES.
+      CALL URDCOM(IU,IOUT,LINE)
+      LLOC = 1
+      CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,NPVAL,DUM,IOUT,IU)
+      WRITE (IOUT,14) NPVAL
+   14 FORMAT (1X,/,1X,'NUMBER OF PARAMETER VALUES TO BE READ FROM',
+     1               ' PARAMETER VALUE FILE:',I5)
+      IF (NPVAL.LE.0) THEN
+        WRITE (IOUT,16)
+   16   FORMAT(1X,'NPVAL IN PARAMETER INPUT FILE MUST BE',
+     1         ' > 0 -- STOP EXECUTION')
+        CALL USTOP(' ')
+      ENDIF
+      IPSUM=NPVAL
+C
+C5-----DEACTIVATE OPTION IF THERE ARE NO PARAMETERS IN FILE.
+      IF(NPVAL.LE.0) THEN
+         WRITE(IOUT,*) ' NPVAL in parameter file is 0,',
+     1            ' so ignoring the parameter file'
+        CLOSE(UNIT=IU)
+        IU=0
+        RETURN
+      END IF
+C
+C6------STOP IF THERE ARE MORE THAN THE MAXIMUM NUMBER OF PARAMETERS.
+      IF(NPVAL.GT.MXPAR) THEN
+         WRITE(IOUT,*) ' PARAMETER FILE CONTAINS',NPVAL,
+     1     ' VALUES, BUT THE MAXIMUM NUMBER OF PARAMETERS IS',MXPAR
+         CALL USTOP(' ')
+      END IF
+C
+C7------WRITE A HEADING FOR THE LIST OF PARAMETERS.
+      WRITE (IOUT,520)
+  520 FORMAT (/,' INFORMATION ON PARAMETERS LISTED IN PARAMETER FILE',/,
+     &             13X,'  VALUE IN',/,
+     &   '    NAME     PARAMETER FILE',/,
+     &   ' ----------  --------------')
+C
+C8-----READ AND WRITE PARAMETER NAMES AND VALUES.
+      DO 70 I=1,NPVAL
+        READ(IU,*,ERR=80) PARNAM(I),B(I)
+        WRITE(IOUT,570) PARNAM(I),B(I)
+  570   FORMAT(1X,A10,2X,G12.5)
+C
+C8A-----CHECK FOR DUPLICATE PARAMETER NAME FOR ALL BUT THE FIRST PARAMETER.
+        IF (I.GT.1) THEN
+          PNI=PARNAM(I)
+          CALL UPCASE(PNI)
+          IM1 = I-1
+          DO 60 J=1,IM1
+            PNJ=PARNAM(J)
+            CALL UPCASE(PNJ)
+            IF (PNI.EQ.PNJ) THEN
+              WRITE(IOUT,500) PARNAM(I)
+  500         FORMAT (' PARAMETER "',A10,
+     &        '" IS LISTED MORE THAN ONCE IN PARAMETER FILE',/,
+     &        ' -- STOP EXECUTION')
+                IERR = 1
+            ENDIF
+   60     CONTINUE
+        ENDIF
+   70 CONTINUE
+C
+C9------WRITE A MESSAGE EXPLAINING THAT THE PARAMETER VALUES REPLACE THE
+C9------VALUES FROM PACKAGE INPUT FILES..
+      WRITE (IOUT,620)
+  620 FORMAT(1X,77('-'))
+      WRITE (IOUT,630)
+  630 FORMAT(' FOR THE PARAMETERS LISTED IN THE TABLE ABOVE,',
+     &       ' PARAMETER VALUES IN INDIVIDUAL',/,
+     &       ' PACKAGE INPUT FILES ARE REPLACED BY THE VALUES FROM',
+     &       ' THE PARAMETER INPUT FILE.')
+C
+C10-----STOP IF THERE WERE DUPLICATE NAMES.
+      IF (IERR.GT.0) THEN
+        WRITE(IOUT,680)
+  680 FORMAT(/,
+     &' ERROR FOUND IN PARAMETER INPUT FILE.  SEARCH ABOVE',/,
+     &' FOR "STOP EXECUTION"')
+         CALL USTOP(' ')
+      ENDIF
+C
+C11-----CLOSE FILE AND RETURN.
+      CLOSE(UNIT=IU)
+      RETURN
+C
+C
+   80 WRITE(IOUT,590)
+  590 FORMAT(1X,/,1X,
+     1  'ERROR ENCOUNTERED IN READING PARAMETER INPUT FILE',/,
+     2       ' -- STOP EXECUTION')
+      CALL USTOP(' ')
+C
+      END
+C
+C--------------------------------------------------------------
+      SUBROUTINE GWF2BAS7U1FM
+C     ******************************************************************
+C     SET HCOF=RHS=0.
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL,ONLY:RHS,AMAT,TURBGRAD,NJAS
+C     ------------------------------------------------------------------
+C
+C1------FOR EACH CELL INITIALIZE HCOF AND RHS ACCUMULATORS.
+      ZERO=0.0D0
+      AMAT=ZERO
+      RHS=ZERO
+C
+C1A------ALLOCATE SPACE FOR TURBGRAD (AT SOLUTION LEVEL FOR NOW) AND INITIALIZE
+      IF(ALLOCATED(TURBGRAD)) DEALLOCATE (TURBGRAD)
+      ALLOCATE(TURBGRAD(NJAS))
+      DO I=1,NJAS
+        TURBGRAD(I) = 1.0
+      ENDDO
+C
+C2------RETURN
+      RETURN
+      END
+C -----------------------------------------------------------------------
+      SUBROUTINE GWF2BAS8ST(KPER)
+C     ******************************************************************
+C     SETUP TIME VARIABLES FOR NEW TIME PERIOD
+C     INITIALIZE HNEW AND HOLD TO ABOVE BOTTOM FOR KPER=1 AND ICONCV=0
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL,     ONLY:IOUT,PERLEN,NSTP,TSMULT,HNEW,HOLD,ICONCV,BOT,
+     *                     IBOUND,NODES,NLAY,NODLAY
+      USE GWFBCFMODULE, ONLY: LAYCON
+      USE GWFBASMODULE,ONLY:DELT,PERTIM,IATS,DELTAT
+C     ------------------------------------------------------------------
+C
+C1------IF NOT ADAPTIVE TIME STEPPING
+      IF(IATS.EQ.0)THEN
+C
+C2------WRITE STRESS PERIOD INFORMATION
+      WRITE (IOUT,1) KPER,PERLEN(KPER),NSTP(KPER),TSMULT(KPER)
+    1 FORMAT('1',/28X,'STRESS PERIOD NO. ',I5,', LENGTH =',G15.7,/
+     1            28X,47('-'),//
+     2            30X,'NUMBER OF TIME STEPS =',I10,//
+     3            31X,'MULTIPLIER FOR DELT =',F10.3)
+C
+C3------CALCULATE THE LENGTH OF THE FIRST TIME STEP
+C3A-----ASSUME TIME STEP MULTIPLIER IS EQUAL TO ONE.
+        DELT=PERLEN(KPER)/FLOAT(NSTP(KPER))
+C
+C3B-----IF TIME STEP MULTIPLIER IS NOT ONE THEN CALCULATE FIRST
+C3B-----TERM OF GEOMETRIC PROGRESSION.
+        ONE=1.
+        IF(TSMULT(KPER).NE.ONE)
+     1    DELT=PERLEN(KPER)*(ONE-TSMULT(KPER))/
+     2        (ONE-TSMULT(KPER)**NSTP(KPER))
+      ELSE
+C4------FOR ADAPTIVE TIME STEPPING
+C
+C5------WRITE STRESS PERIOD INFORMATION
+      WRITE (IOUT,2) KPER,PERLEN(KPER)
+2     FORMAT('1',/28X,'STRESS PERIOD NO. ',I4,', LENGTH =',G15.7,/
+     1            28X,47('-'))
+C6------SET DELT
+        IF(DELTAT.GT.PERLEN(KPER))THEN
+          DELTAT = PERLEN(KPER)
+        ENDIF
+        DELT = DELTAT
+      ENDIF
+C
+C7------PRINT THE LENGTH OF THE FIRST TIME STEP.
+      WRITE (IOUT,9) DELT
+    9 FORMAT(1X,/28X,'INITIAL TIME STEP SIZE =',G15.7)
+C
+C8------INITIALIZE PERTIM (ELAPSED TIME WITHIN STRESS PERIOD).
+      PERTIM=0.
+C
+C9------CHECK THAT ALL PARAMETERS IN PARAMETER VALUE FILE HAVE BEEN DEFINED.
+      IF(KPER.GT.1) CALL SGWF2BAS7STPVAL()
+C
+C10-----SET HEADS ABOVE BOTTOM FOR ICONCV=0 AT FIRST ENTRY
+      IF(KPER.EQ.1.AND.ICONCV.EQ.0)THEN
+        DO K=1,NLAY
+          IF(LAYCON(K).EQ.4)THEN   ! FOR UPSTREAM WEIGHTING ONLY
+          NNDLAY = NODLAY(K)
+          NSTRT = NODLAY(K-1)+1
+          DO N=NSTRT,NNDLAY
+          IF(IBOUND(N).NE.0)THEN
+          IF(HNEW(N).LT.BOT(N))THEN
+            HNEW(N) = BOT(N)
+            HOLD(N) = BOT(N)
+          ENDIF
+          ENDIF
+          ENDDO
+          ENDIF
+        ENDDO
+      ENDIF
+C
+C11------RETURN
+      RETURN
+      END
+C -----------------------------------------------------------------------
+      SUBROUTINE GWF2BAS7AD(KPER,KSTP,INTIB)
+C     ******************************************************************
+C     ADVANCE TO NEXT TIME STEP; COPY NEW INTO OLD VARIABLES
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL,      ONLY:NODES,TSMULT,HNEW,HOLD,So,Sn,NEQS,
+     *                      iunit,area,iout,NODETIBH,NIB1
+      USE GWFBASMODULE,ONLY:DELT,TOTIM,PERTIM,IATS,DELTAT
+C     ------------------------------------------------------------------
+C
+C1------IF NOT FIRST TIME STEP THEN CALCULATE TIME STEP LENGTH FOR STANDARD TIME STEPPING.
+      IF(IATS.EQ.0)THEN
+        IF(KSTP.NE.1) DELT=TSMULT(KPER)*DELT
+      ELSE
+        DELT= DELTAT
+      ENDIF
+C
+C2------ACCUMULATE ELAPSED TIME IN SIMULATION(TOTIM) AND IN THIS
+C2------STRESS PERIOD(PERTIM).
+      TOTIM=TOTIM+DELT
+      PERTIM=PERTIM+DELT
+C
+C3------COPY HNEW TO HOLD.
+      DO 10 N=1,NEQS
+      So(N) = Sn(N)
+   10 HOLD(N)=HNEW(N)
+C
+C4------RETURN
+      RETURN
+      END
+C -----------------------------------------------------------------------
+      SUBROUTINE GWF2READHEADS(KPER,KSTP)
+C     ******************************************************************
+C     READ HEAD FILE AND COMPUTE SATURATIONS
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY:NODES,TSMULT,HNEW,HOLD,So,Sn,NEQS,IUNSTR,TOP,BOT,
+     *   IBOUND,iunit,area,iout,NODLAY,NROW,NCOL,NLAY,NODES,IXSEC,INCLN,
+     *   IDPF,ITRNSP,IDPIN
+      USE GWFBASMODULE,ONLY:DELT,TOTIM,PERTIM,IATS,DELTAT,
+     *  NPTIMES,TIMOT,ITIMOT,TIMOTC,ITIMOTC
+      USE GWFBCFMODULE,ONLY:LAYCON
+      USE GWFBASMODULE, ONLY: IHEDUN
+      USE CLN1MODULE, ONLY: ACLNNDS,NCLNNDS,IFLINCLN,ICLNHD
+      USE GWFDPFMODULE,ONLY: HNEWIM, HOLDIM, SnIM, SoIM, IBOUNDIM,IDPFHD
+      REAL, SAVE,  DIMENSION(:,:,:),ALLOCATABLE  ::HINI
+      REAL,  SAVE, DIMENSION(:),ALLOCATABLE  ::HINI1,HINICLN,HINI1IM
+      DOUBLE PRECISION HD,THCK,TOTTHICK,BBOT,TTOP,TOTIMREAD,PERTIMREAD
+     1  ,AHD
+       SAVE KPERREAD,KSTPREAD,TOTIMREAD,PERTIMREAD,PERTIMOLD
+      CHARACTER*16 TEXT
+C     ------------------------------------------------------------------
+C
+C1------IDENTIFY PACKAGE AND READ HEADS FROM HDS FILE
+      WRITE(IOUT,1) KPER,KSTP
+    1 FORMAT(1X,/1X,'RDH -- READ HEADS SUBROUTINE, VERSION 2',
+     1', 02/28/2021',/,9X,'ENTER SUBROUTINE FOR STRESS PERIOD',
+     3   I10,' AND TIME STEP',I10)
+C ----------------------------------------------------------------------
+C2----INITIALIZE
+      KPERREAD = 1
+      KSTPREAD = 1
+      IGWFHD= IHEDUN
+      ICLNUN = 0
+      IF(INCLN.NE.0) THEN 
+        ICLNUN = ICLNHD
+      ENDIF
+      IDPFUN = 0
+      IF(IDPF.NE.0) THEN
+        IDPFUN = IDPFHD
+      ENDIF  
+      IF(KPER.EQ.1.AND.KSTP.EQ.1) PERTIMOLD = 0.0
+C
+      IF(IDPIN.EQ.0)THEN
+        CALL READBIN4 (IGWFHD,ICLNUN,IDPFUN,KPERREAD,KSTPREAD,
+     1    PERTIMREAD,TOTIMREAD,HNEW,HNEWIM)
+      ELSE
+        CALL READBIN8 (IGWFHD,ICLNUN,IDPFUN,KPERREAD,KSTPREAD,
+     1    PERTIMREAD,TOTIMREAD,HNEW,HNEWIM)
+      ENDIF
+C -------------------------------------------------------------------------------------
+C5------HEADS ARE READ, NOW COMPUTE DELT AND SET TOTIM AND PERTIM FOR TRANSPORT
+CC--!USE DELT, PERTIM AND TOTOM FROM DIS FILE!      DELT = PERTIMREAD - PERTIMOLD
+CC      PERTIMOLD = PERTIMREAD
+CC      PERTIM = PERTIMREAD
+CC      TOTIM = TOTIMREAD
+C---------------------------------------------------------------------
+C6--------GET SNEW FOR THIS HNEW
+      DO K=1,NLAY
+        IF(LAYCON(K).GE.4) THEN
+C----------LOOP THROUGH EACH CELL IN LAYER
+          NNDLAY = NODLAY(K)
+          NSTRT = NODLAY(K-1)+1
+          DO N=NSTRT,NNDLAY
+            IF(IBOUND(N).NE.0) THEN
+C--------------CALCULATE SATURATED THICKNESS.
+              HD=HNEW(N)
+              BBOT=BOT(N)
+              TTOP=TOP(N)
+              TOTTHICK = TTOP - BBOT
+              CALL SAT_THIK(N,HD,TOTTHICK,BBOT,THCK,K,TTOP)
+              Sn(N)=THCK
+            ENDIF
+          ENDDO
+        ENDIF
+      ENDDO
+C
+      IF(INCLN.GT.0) THEN
+C7-------SET SNEW FOR CLN-NODES FOR THIS HNEW
+        DO  IFN=1,NCLNNDS
+          N = ACLNNDS(IFN,1)
+          IFLIN = IFLINCLN(IFN)
+          IF(IBOUND(N).NE.0.AND.IFLIN.LE.0) THEN
+C-------------CALCULATE INITIAL SATURATED THICKNESS FOR UNCONFINED CASES.
+            HD=HNEW(N)
+            BBOT = ACLNNDS(IFN,5)
+            CALL CLN_THIK(IFN,HD,BBOT,THCK)
+            Sn(N)=THCK
+          ENDIF
+        ENDDO
+      ENDIF
+C
+      IF(IDPF.GT.0)THEN
+C8------SET INITIAL SATURATIONS IN IMMOBILE DOMAIN.
+        DO K=1,NLAY
+C8A---------LOOP THROUGH EACH CELL IN LAYER
+          NNDLAY = NODLAY(K)
+          NSTRT = NODLAY(K-1)+1
+          DO N=NSTRT,NNDLAY
+            IF(IBOUNDIM(N).NE.0) THEN
+              IF(LAYCON(K).NE.0.OR.LAYCON(K).NE.2) THEN
+C8B---------------CALCULATE SATURATION OR SATURATED THICKNESS
+                HD=HNEWIM(N)
+                BBOT=BOT(N)
+                TTOP=TOP(N)
+                TOTTHICK = TTOP - BBOT
+                CALL SAT_THIKIM(N,HD,TOTTHICK,BBOT,THCK,K,TTOP)
+                SnIM(N)=THCK
+                SoIM(N) = SnIM(N)
+              ELSE
+                SnIM(N) = 1.0
+                SoIM(N) = 1.0
+              ENDIF
+            ENDIF
+          ENDDO
+        ENDDO
+      ENDIF
+C -----------------------------------------------------------------------
+C9------IF NOT FIRST TIME STEP THEN CALCULATE TIME STEP LENGTH FOR STANDARD TIME STEPPING.
+        IF(IATS.EQ.0)THEN
+          IF(KSTP.NE.1) DELT=TSMULT(KPER)*DELT
+        ELSE
+          DELT= DELTAT
+c9a -----ACCUMULATE ITIMOT IF NPTIMES IS GREATER THAN ZERO SO POINTER IS SET CORRECTLY
+          IF(NPTIMES.GT.0)THEN
+            DO II = 1 , NPTIMES
+               IF(TOTIM. GT. TIMOT(ITIMOT)) THEN
+                 ITIMOT = ITIMOT + 1
+               ELSE  ! JUMP OUT OF LOOP
+                 GO TO 554
+               ENDIF
+            ENDDO
+  554       CONTINUE
+C9B --------ACCUMULATE ITIMOTC ALSO FOR CONCENTRATION
+            DO II = 1 , NPTIMES
+               IF(TOTIM. GT. TIMOTC(ITIMOTC)) THEN
+                 ITIMOTC = ITIMOTC + 1
+               ELSE  ! JUMP OUT OF LOOP
+                 GO TO 555
+               ENDIF
+            ENDDO
+  555       CONTINUE            
+          ENDIF
+        ENDIF
+C
+C10------ACCUMULATE ELAPSED TIME IN SIMULATION(TOTIM) AND IN THIS
+C10------STRESS PERIOD(PERTIM).
+CC        TOTIM=TOTIMREAD
+CC       PERTIM=PERTIMREAD
+C
+C11------RETURN
+      RETURN
+      END
+C -----------------------------------------------------------------------
+      SUBROUTINE READVAR4(IGWFHD,ICLNHD,IDPFHD,VAR,VARIM)
+C     ******************************************************************
+C     READ HEADS FOR ALL DOMAINS (GWF, CLN, DPF) AS NEEDED IN REAL*4 FORMAT
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY:NODES,NEQS,IUNSTR,NODLAY,NROW,NCOL,NLAY,NODES,
+     *   IXSEC,iout
+      USE CLN1MODULE, ONLY: ACLNNDS,NCLNNDS,IFLINCLN
+      REAL, SAVE,  DIMENSION(:,:,:),ALLOCATABLE  ::HINI
+      REAL,  SAVE, DIMENSION(:),ALLOCATABLE  ::HINI1,HINICLN,HINI1IM
+      DOUBLE PRECISION HD,TOTIMREAD,PERTIMREAD,AHD
+      SAVE PERTIMOLD
+      DOUBLE PRECISION VAR(NEQS), VARIM(NODES)
+      CHARACTER*24 TEXT
+C     ------------------------------------------------------------------
+C
+      IF(IUNSTR.EQ.0) THEN
+        ALLOCATE(HINI(NCOL,NROW,NLAY))
+      ELSE
+        ALLOCATE(HINI1(Nodes))
+        IF(IDPFHD.GT.0) ALLOCATE(HINI1IM(Nodes))
+      ENDIF
+      IF(ICLNHD.GT.0) ALLOCATE(HINICLN(NCLNNDS))
+C ----------------------------------------------------------------------
+C3------READ HEAD FILES
+      INU = IGWFHD
+      TEXT = '        GWF '
+      IF(IUNSTR.EQ.0) THEN
+C3A-------FOR STRUCTURED GRID READ BINARY FILE INTO HINI
+        DO 350 K=1,NLAY
+          KK=K
+          CALL U2DREL(HINI(1,1,K),TEXT,NROW,NCOL,KK,INU,IOUT)
+350     CONTINUE
+      ELSE
+C3B--------FOR UNSTRUCTURED GRID READ BINARY FILE INTO HINI1
+        DO K=1,NLAY
+          NNDLAY = NODLAY(K)
+          NSTRT = NODLAY(K-1)+1
+          NDSLAY = NNDLAY - NODLAY(K-1)
+          CALL U1DREL(HINI1(NSTRT),TEXT,NDSLAY,K,INU,IOUT)            
+        ENDDO
+      ENDIF
+C3C-------FOR CLN NODES READ BINARY FILE INTO HINICLN
+      IF(ICLNHD.GT.0)THEN
+        INU = ICLNHD
+        TEXT = '        CLN '        
+        IDUM = 0
+        CALL U1DREL(HINICLN,TEXT,NCLNNDS,IDUM,INU,IOUT)
+      ENDIF
+      IF(IDPFHD.GT.0)THEN
+C3D-------FOR DPF NODES READ BINARY FILE INTO HINI1IM
+        INU = IDPFHD
+        TEXT = '        DPF '
+        DO K=1,NLAY
+          NNDLAY = NODLAY(K)
+          NSTRT = NODLAY(K-1)+1
+          NDSLAY = NNDLAY - NODLAY(K-1)          
+          CALL U1DREL(HINI1IM(NSTRT),TEXT,NDSLAY,K,INU,IOUT)
+        ENDDO
+      ENDIF
+C--------------------------------------------------------------------------------------
+C4------UPDATE HEAD ARRAYS
+      IF(IUNSTR.EQ.0) THEN
+C4A-------FOR STRUCTURED GRID COPY HINI INTO HNEW
+        N=0
+        DO 360 K=1,NLAY
+        DO 360 I=1,NROW
+        DO 360 J=1,NCOL
+          N=N+1
+          VAR(N) = HINI(J,I,K)
+360     CONTINUE
+        DEALLOCATE (HINI)
+      ELSE
+C4B-------FOR UNSTRUCTURED GRID COPY HTEMP1 INTO HNEW
+        DO N=1,NODES
+          VAR(N) =  HINI1(N)
+        ENDDO
+        DEALLOCATE (HINI1)
+      ENDIF
+C
+      IF(ICLNHD.GT.0)THEN
+C4C-------FOR CLN NODES COPY HTEMP INTO HNEW
+        DO N=1,NCLNNDS
+          NG = NODES + N
+          VAR(NG) =  HINICLN(N)
+        ENDDO
+        DEALLOCATE (HINICLN)
+      ENDIF
+C
+      IF(IDPFHD.GT.0)THEN
+C4D-------FOR DUAL DOMAIN FLOW GRID COPY HTEMP1IM INTO HNEWIM
+        DO N=1,NODES
+          VARIM(N) =  HINI1IM(N)
+        ENDDO
+        DEALLOCATE (HINI1IM)
+      ENDIF
+C
+C11------RETURN
+      RETURN
+      END
+C -----------------------------------------------------------------------
+      SUBROUTINE READVAR8(IGWFHD,ICLNHD,IDPFHD,VAR,VARIM)
+C     ******************************************************************
+C     READ HEADS FOR ALL DOMAINS (GWF, CLN, DPF) AS NEEDED IN REAL*4 FORMAT
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY:NODES,NEQS,IUNSTR,NODLAY,NROW,NCOL,NLAY,NODES,
+     *   IXSEC,iout
+      USE CLN1MODULE, ONLY: ACLNNDS,NCLNNDS,IFLINCLN
+      DOUBLE PRECISION, SAVE,  DIMENSION(:,:,:),ALLOCATABLE  ::HINI
+      DOUBLE PRECISION,  SAVE, DIMENSION(:),
+     1   ALLOCATABLE  ::HINI1,HINICLN,HINI1IM
+      DOUBLE PRECISION HD,TOTIMREAD,PERTIMREAD,AHD
+      SAVE PERTIMOLD
+      DOUBLE PRECISION VAR(NEQS), VARIM(NODES)
+      CHARACTER*24 TEXT
+C     ------------------------------------------------------------------
+C
+      IF(IUNSTR.EQ.0) THEN
+        ALLOCATE(HINI(NCOL,NROW,NLAY))
+      ELSE
+        ALLOCATE(HINI1(Nodes))
+        IF(IDPFHD.GT.0) ALLOCATE(HINI1IM(Nodes))
+      ENDIF
+      IF(ICLNHD.GT.0) ALLOCATE(HINICLN(NCLNNDS))
+C ----------------------------------------------------------------------
+C3------READ HEAD FILES
+      INU = IGWFHD
+      TEXT = '        GWF '
+      IF(IUNSTR.EQ.0) THEN
+C3A-------FOR STRUCTURED GRID READ BINARY FILE INTO HINI
+        DO 350 K=1,NLAY
+          KK=K
+          CALL U2DREL8(HINI(1,1,K),TEXT,NROW,NCOL,KK,INU,IOUT)
+350     CONTINUE
+      ELSE
+C3B--------FOR UNSTRUCTURED GRID READ BINARY FILE INTO HINI1
+        DO K=1,NLAY
+          NNDLAY = NODLAY(K)
+          NSTRT = NODLAY(K-1)+1
+          NDSLAY = NNDLAY - NODLAY(K-1)          
+          CALL U1DREL8(HINI1(NSTRT),TEXT,NDSLAY,K,INU,IOUT)
+        ENDDO
+      ENDIF
+C3C-------FOR CLN NODES READ BINARY FILE INTO HINICLN
+      IF(ICLNHD.GT.0)THEN
+        INU = ICLNHD
+        TEXT = '        CLN '
+        IDUM = 0
+        CALL U1DREL8(HINICLN,TEXT,NCLNNDS,IDUM,INU,IOUT)
+      ENDIF
+      IF(IDPFHD.GT.0)THEN
+C3D-------FOR DPF NODES READ BINARY FILE INTO HINI1IM
+        INU = IDPFHD
+        TEXT = '        DPF '
+        DO K=1,NLAY
+          NNDLAY = NODLAY(K)
+          NSTRT = NODLAY(K-1)+1
+          NDSLAY = NNDLAY - NODLAY(K-1)          
+          CALL U1DREL8(HINI1IM(NSTRT),TEXT,NDSLAY,K,INU,IOUT)
+        ENDDO
+      ENDIF
+C--------------------------------------------------------------------------------------
+C4------UPDATE HEAD ARRAYS
+      IF(IUNSTR.EQ.0) THEN
+C4A-------FOR STRUCTURED GRID COPY HINI INTO HNEW
+        N=0
+        DO 360 K=1,NLAY
+        DO 360 I=1,NROW
+        DO 360 J=1,NCOL
+          N=N+1
+          VAR(N) = HINI(J,I,K)
+360     CONTINUE
+        DEALLOCATE (HINI)
+      ELSE
+C4B-------FOR UNSTRUCTURED GRID COPY HTEMP1 INTO HNEW
+        DO N=1,NODES
+          VAR(N) =  HINI1(N)
+        ENDDO
+        DEALLOCATE (HINI1)
+      ENDIF
+C
+      IF(ICLNHD.GT.0)THEN
+C4C-------FOR CLN NODES COPY HTEMP INTO HNEW
+        DO N=1,NCLNNDS
+          NG = NODES + N
+          VAR(NG) =  HINICLN(N)
+        ENDDO
+        DEALLOCATE (HINICLN)
+      ENDIF
+C
+      IF(IDPFHD.GT.0)THEN
+C4D-------FOR DUAL DOMAIN FLOW GRID COPY HTEMP1IM INTO HNEWIM
+        DO N=1,NODES
+          VARIM(N) =  HINI1IM(N)
+        ENDDO
+        DEALLOCATE (HINI1IM)
+      ENDIF
+C
+C11------RETURN
+      RETURN
+      END
+C -----------------------------------------------------------------------
+      SUBROUTINE READBIN4(IGWFHD,ICLNHD,IDPFHD,KPERREAD,KSTPREAD,
+     1    PERTIMREAD,TOTIMREAD,VAR,VARIM)
+C     ******************************************************************
+C     READ HEADS FOR ALL DOMAINS (GWF, CLN, DPF) AS NEEDED IN REAL*4 FORMAT
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY:NODES,NEQS,IUNSTR,NODLAY,NROW,NCOL,NLAY,NODES,
+     *   IXSEC,iout
+      USE CLN1MODULE, ONLY: ACLNNDS,NCLNNDS,IFLINCLN
+      REAL, SAVE,  DIMENSION(:,:,:),ALLOCATABLE  ::HINI
+      REAL,  SAVE, DIMENSION(:),ALLOCATABLE  ::HINI1,HINICLN,HINI1IM
+      DOUBLE PRECISION HD,TOTIMREAD,PERTIMREAD,AHD
+      SAVE PERTIMOLD
+      DOUBLE PRECISION VAR(NEQS), VARIM(NODES)
+      CHARACTER*16 TEXT
+C     ------------------------------------------------------------------
+C
+      IF(IUNSTR.EQ.0) THEN
+        ALLOCATE(HINI(NCOL,NROW,NLAY))
+      ELSE
+        ALLOCATE(HINI1(Nodes))
+        IF(IDPFHD.GT.0) ALLOCATE(HINI1IM(Nodes))
+      ENDIF
+      IF(ICLNHD.GT.0) ALLOCATE(HINICLN(NCLNNDS))
+C ----------------------------------------------------------------------
+C3------READ HEAD FILES
+      INU = IGWFHD
+      IF(IUNSTR.EQ.0) THEN
+C3A-------FOR STRUCTURED GRID READ BINARY FILE INTO HINI
+        DO 350 K=1,NLAY
+          KK=K
+          CALL ULASAVRD(HINI(1,1,K),TEXT,KSTPREAD,KPERREAD,PERTIMREAD,
+     1            TOTIMREAD,NCOL,NROW,KK,INU)
+350     CONTINUE
+        WRITE(IOUT,351)KPERREAD,KSTPREAD
+351     FORMAT(10X,'*** GWF FILE READ FOR STRESS PERIOD = ',
+     1      I10,', AND TIME-STEP = ',I10,' ***')
+      ELSE
+C3B--------FOR UNSTRUCTURED GRID READ BINARY FILE INTO HINI1
+        DO K=1,NLAY
+          NNDLAY = NODLAY(K)
+          NSTRT = NODLAY(K-1)+1
+          NDSLAY = NNDLAY - NODLAY(K-1)          
+          CALL ULASAVURD(HINI1,TEXT,KSTPREAD,KPERREAD,PERTIMREAD,
+     1             TOTIMREAD,NSTRT,NNDLAY,ILAY,INU,NODES)
+        ENDDO
+        WRITE(IOUT,351)KPERREAD,KSTPREAD
+      ENDIF
+C3C-------FOR CLN NODES READ BINARY FILE INTO HINICLN
+      IF(ICLNHD.GT.0)THEN
+        INU = ICLNHD
+        IDUM = 1
+        CALL ULASAVRD(HINICLN,TEXT,KSTPREAD,KPERREAD,PERTIMREAD,
+     1              TOTIMREAD,NCLNNDS,IDUM,IDUM,INU)
+        WRITE(IOUT,352)KPERREAD,KSTPREAD
+352     FORMAT(10X,'*** CLN FILE READ FOR STRESS PERIOD = ',
+     1      I10,', AND TIME-STEP = ',I10,' ***')        
+      ENDIF
+      IF(IDPFHD.GT.0)THEN
+C3D-------FOR DPF NODES READ BINARY FILE INTO HINI1IM
+        INU = IDPFHD
+        DO K=1,NLAY
+          NNDLAY = NODLAY(K)
+          NSTRT = NODLAY(K-1)+1
+          NDSLAY = NNDLAY - NODLAY(K-1)          
+          CALL ULASAVURD(HINI1IM,TEXT,KSTPREAD,KPERREAD,PERTIMREAD,
+     1             TOTIMREAD,NSTRT,NNDLAY,ILAY,INU,NODES)
+        ENDDO
+        WRITE(IOUT,353)KPERREAD,KSTPREAD
+353     FORMAT(10X,'*** DPF FILE READ FOR STRESS PERIOD = ',
+     1      I10,', AND TIME-STEP = ',I10,' ***')        
+      ENDIF
+C--------------------------------------------------------------------------------------
+C4------UPDATE HEAD ARRAYS
+      IF(IUNSTR.EQ.0) THEN
+C4A-------FOR STRUCTURED GRID COPY HINI INTO HNEW
+        N=0
+        DO 360 K=1,NLAY
+        DO 360 I=1,NROW
+        DO 360 J=1,NCOL
+          N=N+1
+          VAR(N) = HINI(J,I,K)
+360     CONTINUE
+        DEALLOCATE (HINI)
+      ELSE
+C4B-------FOR UNSTRUCTURED GRID COPY HTEMP1 INTO HNEW
+        DO N=1,NODES
+          VAR(N) =  HINI1(N)
+        ENDDO
+        DEALLOCATE (HINI1)
+      ENDIF
+C
+      IF(ICLNHD.GT.0)THEN
+C4C-------FOR CLN NODES COPY HTEMP INTO HNEW
+        DO N=1,NCLNNDS
+          NG = NODES + N
+          VAR(NG) =  HINICLN(N)
+        ENDDO
+        DEALLOCATE (HINICLN)
+      ENDIF
+C
+      IF(IDPFHD.GT.0)THEN
+C4D-------FOR DUAL DOMAIN FLOW GRID COPY HTEMP1IM INTO HNEWIM
+        DO N=1,NODES
+          VARIM(N) =  HINI1IM(N)
+        ENDDO
+        DEALLOCATE (HINI1IM)
+      ENDIF
+C
+C11------RETURN
+      RETURN
+      END
+C -----------------------------------------------------------------------
+      SUBROUTINE READBIN8(IGWFHD,ICLNHD,IDPFHD,KPERREAD,KSTPREAD,
+     1    PERTIMREAD,TOTIMREAD,VAR,VARIM)
+C     ******************************************************************
+C     READ HEADS FOR ALL DOMAINS (GWF, CLN, DPF) AS NEEDED IN REAL*8 FORMAT
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY:NODES,NEQS,IUNSTR,NODLAY,NROW,NCOL,NLAY,NODES,
+     *   IXSEC,iout
+      USE CLN1MODULE, ONLY: ACLNNDS,NCLNNDS,IFLINCLN
+      DOUBLE PRECISION, SAVE,  DIMENSION(:,:,:),ALLOCATABLE  ::HINI
+      DOUBLE PRECISION, SAVE, DIMENSION(:),ALLOCATABLE  ::HINI1,HINICLN,
+     1  HINI1IM
+      DOUBLE PRECISION VAR(NEQS), VARIM(NODES)
+      DOUBLE PRECISION HD,TOTIMREAD,PERTIMREAD,AHD
+      SAVE PERTIMOLD
+      CHARACTER*16 TEXT
+C     ------------------------------------------------------------------
+C
+      IF(IUNSTR.EQ.0) THEN
+        ALLOCATE(HINI(NCOL,NROW,NLAY))
+      ELSE
+        ALLOCATE(HINI1(Nodes))
+        IF(IDPFHD.GT.0) ALLOCATE(HINI1IM(Nodes))
+      ENDIF
+      IF(ICLNHD.GT.0) ALLOCATE(HINICLN(NCLNNDS))
+C ----------------------------------------------------------------------
+C3------READ HEAD FILES
+      INU = IGWFHD
+      IF(IUNSTR.EQ.0) THEN
+C3A-------FOR STRUCTURED GRID READ BINARY FILE INTO HINI
+        DO 350 K=1,NLAY
+          KK=K
+          CALL ULASAVRD8(HINI(1,1,K),TEXT,KSTPREAD,KPERREAD,PERTIMREAD,
+     1            TOTIMREAD,NCOL,NROW,KK,INU)
+350     CONTINUE
+        WRITE(IOUT,351)KPERREAD,KSTPREAD
+351     FORMAT(10X,'*** FILE READ FOR STRESS PERIOD = ',
+     1      I10,', AND TIME-STEP = ',I10,' ***')
+      ELSE
+C3B--------FOR UNSTRUCTURED GRID READ BINARY FILE INTO HINI1
+        DO K=1,NLAY
+          NNDLAY = NODLAY(K)
+          NSTRT = NODLAY(K-1)+1
+          NDSLAY = NNDLAY - NODLAY(K-1)          
+          CALL ULASAVURD8(HINI1,TEXT,KSTPREAD,KPERREAD,PERTIMREAD,
+     1             TOTIMREAD,NSTRT,NNDLAY,ILAY,INU,NODES)
+        ENDDO
+        WRITE(IOUT,351)KPERREAD,KSTPREAD
+      ENDIF
+C3C-------FOR CLN NODES READ BINARY FILE INTO HINICLN
+      IF(ICLNHD.GT.0)THEN
+        INU = ICLNHD
+        IDUM = 1
+        CALL ULASAVRD8(HINICLN,TEXT,KSTPREAD,KPERREAD,PERTIMREAD,
+     1              TOTIMREAD,NCLNNDS,IDUM,IDUM,INU)
+      ENDIF
+      IF(IDPFHD.GT.0)THEN
+C3D-------FOR DPF NODES READ BINARY FILE INTO HINI1IM
+        INU = IDPFHD
+        DO K=1,NLAY
+          NNDLAY = NODLAY(K)
+          NSTRT = NODLAY(K-1)+1
+          NDSLAY = NNDLAY - NODLAY(K-1)          
+          CALL ULASAVURD8(HINI1IM,TEXT,KSTPREAD,KPERREAD,PERTIMREAD,
+     1             TOTIMREAD,NSTRT,NNDLAY,ILAY,INU,NODES)
+        ENDDO
+      ENDIF
+C--------------------------------------------------------------------------------------
+C4------UPDATE HEAD ARRAYS
+      IF(IUNSTR.EQ.0) THEN
+C4A-------FOR STRUCTURED GRID COPY HINI INTO HNEW
+        N=0
+        DO 360 K=1,NLAY
+        DO 360 I=1,NROW
+        DO 360 J=1,NCOL
+          N=N+1
+          VAR(N) = HINI(J,I,K)
+360     CONTINUE
+        DEALLOCATE (HINI)
+      ELSE
+C4B-------FOR UNSTRUCTURED GRID COPY HTEMP1 INTO HNEW
+        DO N=1,NODES
+          VAR(N) =  HINI1(N)
+        ENDDO
+        DEALLOCATE (HINI1)
+      ENDIF
+C
+      IF(ICLNHD.GT.0)THEN
+C4C-------FOR CLN NODES COPY HTEMP INTO HNEW
+        DO N=1,NCLNNDS
+          NG = NODES + N
+          VAR(NG) =  HINICLN(N)
+        ENDDO
+        DEALLOCATE (HINICLN)
+      ENDIF
+C
+      IF(IDPFHD.GT.0)THEN
+C4D-------FOR DUAL DOMAIN FLOW GRID COPY HTEMP1IM INTO HNEWIM
+        DO N=1,NODES
+          VARIM(N) =  HINI1IM(N)
+        ENDDO
+        DEALLOCATE (HINI1IM)
+      ENDIF
+C
+C11------RETURN
+      RETURN
+      END
+C -----------------------------------------------------------------------
+      SUBROUTINE GWF2FASTFORWARD(KPER,KSTP)
+C     ******************************************************************
+C     READ OLD HEAD FILES AND FAST FORWARD TO REQUIRED STRESS AND TIME
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY:NODES,TSMULT,HNEW,HOLD,So,Sn,NEQS,IUNSTR,TOP,BOT,
+     *   IBOUND,iunit,area,iout,NODLAY,NROW,NCOL,NLAY,NODES,IXSEC,INCLN,
+     *   IDPF,ITRNSP,IDPIN
+      USE GWFBASMODULE,ONLY:DELT,TOTIM,PERTIM,IATS,DELTAT,
+     *  IFAST,ISPFAST,ITSFAST,IUGFAST,IUCFAST,IUDFAST,
+     *  NPTIMES,TIMOT,ITIMOT,TIMOTC,ITIMOTC
+      USE GWFBCFMODULE,ONLY:LAYCON
+      USE CLN1MODULE, ONLY: ACLNNDS,NCLNNDS,IFLINCLN
+      USE GWFDPFMODULE, ONLY: HNEWIM, HOLDIM, SnIM, SoIM, IBOUNDIM
+      DOUBLE PRECISION HD,THCK,TOTTHICK,BBOT,TTOP,TOTIMREAD,PERTIMREAD
+     1  ,AHD
+       SAVE KPERREAD,KSTPREAD,TOTIMREAD,PERTIMREAD
+       SAVE IGWFHD, ICLNHD, IDPFHD
+      CHARACTER*16 TEXT
+C     ------------------------------------------------------------------
+C
+C1------IDENTIFY PACKAGE AND READ HEADS FROM FASTFORWARD FILE FOR THIS TIME
+      INU = IUGFAST
+      WRITE(IOUT,1) KPER,KSTP
+    1 FORMAT(99('-'),/1X,'FST -- FASTFORWARDING FLOW SUBROUTINE, ',
+     1'VERSION 2, 10/29/2018',/,9X,'ENTER SUBROUTINE FOR STRESS PERIOD',
+     3   I10,' AND TIME STEP',I10)
+C ----------------------------------------------------------------------
+C2----FIRST TIME INTO SUBROUTINE, INITIALIZE, READ HEADS, AND BE READY
+      IF (KSTP.EQ.1.AND.KPER.EQ.1) THEN
+        KPERREAD = 1
+        KSTPREAD = 1
+        IGWFHD= IUGFAST
+        ICLNUN = 0
+        ICLNHD = 0
+        IF(INCLN.NE.0) THEN
+          ICLNHD = IUCFAST
+        ENDIF
+        IDPFUN = 0
+        IDPFHD = 0
+        IF(IDPF.NE.0) THEN
+          IDPFHD = IUDFAST
+        ENDIF        
+C ----------------------------------------------------------------------
+C3------NEED TO READ THE FAST FORWARD FILE TILL ISPFACT AND ITSFACT ARE FOUND
+333     CONTINUE
+C        
+        WRITE(IOUT,*)'          *** FASTFORWARDING HEAD... ***'
+        IF(IDPIN.EQ.0)THEN
+          CALL READBIN4 (IGWFHD,ICLNHD,IDPFHD,KPERREAD,KSTPREAD,
+     1      PERTIMREAD,TOTIMREAD,HNEW,HNEWIM)
+        ELSE
+          CALL READBIN8 (IGWFHD,ICLNHD,IDPFHD,KPERREAD,KSTPREAD,
+     1      PERTIMREAD,TOTIMREAD,HNEW,HNEWIM)
+        ENDIF
+C ----------------------------------------------------------------------
+C4A-----CHECK IF FILE IS PAST FASTFORWARD TIMES
+        IF(KPERREAD.GT. ISPFAST) THEN
+          WRITE(IOUT,353) KPERREAD, ISPFAST, KSTPREAD,ITSFAST
+          STOP
+353     FORMAT(10X,'*** STRESS PERIOD IN FILE (KPERREAD) IS PAST',
+     1    1X,'ISPFAST ***'/10X,'KPERREAD = ',I7,' ISPFAST = ',I7,
+     1    ' KSTPREAD =',1X,I7,' ITSFAST = ',I7)
+        ELSEIF(KPERREAD.EQ.ISPFAST. AND. KSTPREAD.GT. ITSFAST) THEN
+          WRITE(IOUT,354) KPERREAD, ISPFAST, KSTPREAD,ITSFAST
+          STOP
+354     FORMAT(10X,'*** TIME STEP IN FILE (KSTPREAD) IS PAST',
+     1    1X,'ITSFAST ***'/10X,'KPERREAD = ',I7,' ISPFAST = ',I7,
+     1    ' KSTPREAD =',1X,I7,' ITSFAST = ',I7)
+        ENDIF
+C
+C4B-----RE-READ FILE IF ISPFASTC AND ITSFASTC ARE NOT REACHED
+        IF(.NOT.(KPERREAD.EQ. ISPFAST.AND.KSTPREAD.EQ.ITSFAST))GO TO 333
+C ----------------------------------------------------------------------
+C5------ IF TIME AND STRESS PERIOD NOT FOUND, PRINT ERROR AND STOP
+        IF(KPERREAD.NE. ISPFAST.AND.KSTPREAD.NE.ITSFAST) THEN
+          WRITE(IOUT,352) KPERREAD, ISPFAST, KSTPREAD,ITSFAST
+          STOP
+        ENDIF
+352     FORMAT(10X,'*** STRESS PERIOD AND TIME STEP NOT FOUND IN FILE',
+     1    1X,'***'/10X,'KPERREAD = ',I7,' ISPFAST = ',I7,' KSTPREAD =',
+     1    1X,I7,' ITSFAST = ',I7)
+C ----------------------------------------------------------------------
+      ENDIF
+C ----------------------------------------------------------------------
+C6------HEAEDS ARE RESIDING IN HINI ARRAYS, CHECK STRESS PERIOD AND TIME STEP
+      IF(KPER.NE.ISPFAST) THEN
+C6A ------STRESS PERIOD NOT REACHED. FLAG JUMPS TO NEXT STRESS PERIOD
+        IFAST = 2
+        WRITE(IOUT,372)
+372     FORMAT(10X,'*** STRESS PERIOD NOT REACHED, FASTFORWARDING WITH',
+     1   1X,'IFAST = 2 ***' )
+      ELSEIF(KSTP.NE.ITSFAST)THEN
+C6B ------STRESS PERIOD REACHED, BUT NOT TIME STEP. FLAG JUMPS TO NEXT TIME STEP
+        IFAST = 1
+        WRITE(IOUT,373)
+373     FORMAT(10X,'*** STRESS PERIOD REACHED, BUT TIME STEP NOT',
+     1   1X,'REACHED, FASTFORWARDING WITH IFAST = 1 ***' )
+      ELSE
+C6C ------STRESS PERIOD AND TIME STEP REACHED, SET FLAG THAT F-FORWARD HAS ARRIVED
+        IFAST = 3
+        WRITE(IOUT,374)
+374     FORMAT(10X,'*** STRESS PERIOD AND TIME STEP REACHED',
+     1   1X,'FASTFORWARDING IS DONE. IFAST = 3 ***'/
+     1   10X,'MOVING ON TO NEXT TIME STEP OR STRESS PERIOD')
+      ENDIF
+C--------------------------------------------------------------------------------------
+C7------STOP FAST-FORWARDING ONCE SP AND TS ARE REACHED, AND UPDATE ALL ARRAYS
+      IF(IFAST.EQ.3)THEN
+C9--------GET SNEW FOR THIS HNEW
+        DO K=1,NLAY
+          IF(LAYCON(K).GE.4) THEN
+C-----------LOOP THROUGH EACH CELL IN LAYER
+            NNDLAY = NODLAY(K)
+            NSTRT = NODLAY(K-1)+1
+            DO N=NSTRT,NNDLAY
+              IF(IBOUND(N).NE.0) THEN
+C---------------CALCULATE SATURATED THICKNESS.
+                HD=HNEW(N)
+                BBOT=BOT(N)
+                TTOP=TOP(N)
+                TOTTHICK = TTOP - BBOT
+                CALL SAT_THIK(N,HD,TOTTHICK,BBOT,THCK,K,TTOP)
+                Sn(N)=THCK
+              ENDIF
+            ENDDO
+          ENDIF
+        ENDDO
+C
+        IF(INCLN.GT.0) THEN
+C10-------SET SNEW FOR CLN-NODES FOR THIS HNEW
+          DO  IFN=1,NCLNNDS
+            N = ACLNNDS(IFN,1)
+            IFLIN = IFLINCLN(IFN)
+            IF(IBOUND(N).NE.0.AND.IFLIN.LE.0) THEN
+C-------------CALCULATE INITIAL SATURATED THICKNESS FOR UNCONFINED CASES.
+              HD=HNEW(N)
+              BBOT = ACLNNDS(IFN,5)
+              CALL CLN_THIK(IFN,HD,BBOT,THCK)
+              Sn(N)=THCK
+            ENDIF
+          ENDDO
+        ENDIF
+C
+        IF(IDPF.GT.0)THEN
+C9------SET INITIAL SATURATIONS IN IMMOBILE DOMAIN.
+          DO K=1,NLAY
+C9A---------LOOP THROUGH EACH CELL IN LAYER
+            NNDLAY = NODLAY(K)
+            NSTRT = NODLAY(K-1)+1
+            DO N=NSTRT,NNDLAY
+              IF(IBOUNDIM(N).NE.0) THEN
+                IF(LAYCON(K).NE.0.OR.LAYCON(K).NE.2) THEN
+C9B---------------CALCULATE SATURATION OR SATURATED THICKNESS
+                  HD=HNEWIM(N)
+                  BBOT=BOT(N)
+                  TTOP=TOP(N)
+                  TOTTHICK = TTOP - BBOT
+                  CALL SAT_THIKIM(N,HD,TOTTHICK,BBOT,THCK,K,TTOP)
+                  SnIM(N)=THCK
+                  SoIM(N) = SnIM(N)
+                ELSE
+                  SnIM(N) = 1.0
+                  SoIM(N) = 1.0
+                ENDIF
+              ENDIF
+            ENDDO
+          ENDDO
+        ENDIF
+C-----------NEED TO UPDATE FOR TRANSPORT (SINGLE AND DUAL DOMAIN)
+
+C -----------------------------------------------------------------------
+C11------IF NOT FIRST TIME STEP THEN CALCULATE TIME STEP LENGTH FOR STANDARD TIME STEPPING.
+        IF(IATS.EQ.0)THEN
+          IF(KSTP.NE.1) DELT=TSMULT(KPER)*DELT
+        ELSE
+          DELT= DELTAT
+c11a -----ACCUMULATE ITIMOT IF NPTIMES IS GREATER THAN ZERO SO POINTER IS SET CORRECTLY
+          IF(NPTIMES.GT.0)THEN
+            DO II = 1 , NPTIMES
+               IF(TOTIMREAD. GT. TIMOT(ITIMOT)) THEN
+                 ITIMOT = ITIMOT + 1
+               ELSE  ! JUMP OUT OF LOOP
+                 GO TO 554
+               ENDIF
+            ENDDO
+  554       CONTINUE                     
+          ENDIF
+        ENDIF
+C
+C12------ACCUMULATE ELAPSED TIME IN SIMULATION(TOTIM) AND IN THIS
+C12------STRESS PERIOD(PERTIM).
+        TOTIM=TOTIMREAD
+        PERTIM=PERTIMREAD
+      ENDIF
+C
+C14------RETURN
+      RETURN
+      END
+C -----------------------------------------------------------------------
+      SUBROUTINE GWT2FASTFORWARD(KPER,KSTP)
+C     ******************************************************************
+C     READ OLD CONC FILES AND FAST FORWARD TO REQUIRED STRESS AND TIME
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY:NODES,TSMULT,NEQS,IUNSTR,TOP,BOT,
+     *   IBOUND,iunit,area,iout,NODLAY,NROW,NCOL,NLAY,NODES,IXSEC,INCLN,
+     *   IDPT,ITRNSP,IDPIN
+      USE GWFBASMODULE,ONLY:DELT,TOTIM,PERTIM,IATS,DELTAT,
+     *   IFAST,ISPFASTC,ITSFASTC,IUGFASTC,IUCFASTC,IUDFASTC,IUMFASTC,
+     *   NPTIMES,TIMOTC,ITIMOTC
+      USE GWFBCFMODULE,ONLY:LAYCON
+      USE GWTBCTMODULE, ONLY: CONC, CONCO, NTCOMP
+      USE CLN1MODULE, ONLY: ACLNNDS,NCLNNDS,IFLINCLN
+      USE GWTDPTMODULE, ONLY: CONCIM, CONCOIM
+      DOUBLE PRECISION HD,THCK,TOTTHICK,BBOT,TTOP,TOTIMREAD,PERTIMREAD
+     1  ,AHD
+       SAVE KPERREAD,KSTPREAD,TOTIMREAD,PERTIMREAD
+       SAVE IGWFHD,ICLNHD,IDPFHD
+      CHARACTER*16 TEXT
+C     ------------------------------------------------------------------
+C
+C1------IDENTIFY PACKAGE AND READ HEADS FROM FASTFOWRARDC FILE FOR THIS TIME
+      INU = IUGFASTC
+      WRITE(IOUT,1) KPER,KSTP
+    1 FORMAT(99('-'),/1X,'FST -- FASTFORWARDING TRANSPORT SUBROUTINE, ',
+     1'VERSION 2, 10/29/2018',/,9X,'ENTER SUBROUTINE FOR STRESS PERIOD',
+     3   I10,' AND TIME STEP',I10)
+C ----------------------------------------------------------------------
+C2----FIRST TIME INTO SUBROUTINE, INITIALIZE, READ HEADS, AND BE READY
+      IF (KSTP.EQ.1.AND.KPER.EQ.1) THEN
+        KPERREAD = 1
+        KSTPREAD = 1
+        IGWFHD= IUGFASTC
+        ICLNUN = 0
+        ICLNHD = 0
+        IF(INCLN.NE.0) THEN
+          ICLNHD = IUCFASTC
+        ENDIF
+        IDPFUN = 0
+        IDPFHD = 0
+        IF(IDPT.NE.0) THEN
+          IDPFHD = IUDFASTC
+        ENDIF        
+C ----------------------------------------------------------------------
+C3------NEED TO READ THE FAST FORWARD FILE TILL ISPFACT AND ITSFACT ARE FOUND
+333     CONTINUE
+C        
+        DO ICOMP=1,NTCOMP
+          WRITE(IOUT,351) ICOMP
+351       FORMAT(9X,'*** FASTFORWARDING CONC TO COMPONENT',I5,'... ***')
+          IF(IDPIN.EQ.0)THEN
+            CALL READBIN4 (IGWFHD,ICLNHD,IDPFHD,KPERREAD,KSTPREAD,
+     1        PERTIMREAD,TOTIMREAD,CONC(1,ICOMP),CONCIM(1,ICOMP))
+          ELSE
+            CALL READBIN8 (IGWFHD,ICLNHD,IDPFHD,KPERREAD,KSTPREAD,
+     1        PERTIMREAD,TOTIMREAD,CONC(1,ICOMP),CONCIM(1,ICOMP)) 
+          ENDIF          
+        ENDDO
+C-----------------------------------------------------------------------        
+C3D-------FOR MDT NODES READ BINARY FILE TERMS INTO HINI1MD1, HINTMD2, ETC
+C        IF(INMDT.GT.0)THEN
+C          INU = IUMFASTC
+C          DO ICOMP=1,NTCOMP
+C          DO K=1,NLAY
+C            NNDLAY = NODLAY(K)
+C            NSTRT = NODLAY(K-1)+1
+CC            CALL ULASAVURD(HINI1MD1,TEXT,KSTPREAD,KPERREAD,PERTIMREAD,
+CC     1               TOTIMREAD,NSTRT,NNDLAY,ILAY,INU,NODES)
+C          ENDDO
+C          ENDDO
+C        ENDIF
+C ----------------------------------------------------------------------
+C4A-----CHECK IF FILE IS PAST FASTFORWARD TIMES
+        IF(KPERREAD.GT. ISPFASTC) THEN
+          WRITE(IOUT,353) KPERREAD, ISPFASTC, KSTPREAD,ITSFASTC
+          STOP
+353     FORMAT(10X,'*** STRESS PERIOD IN FILE (KPERREAD) IS PAST',
+     1    1X,'ISPFASTC ***'/10X,'KPERREAD = ',I7,' ISPFASTC = ',I7,
+     1    ' KSTPREAD =',1X,I7,' ITSFASTC = ',I7)
+        ELSEIF(KPERREAD.EQ.ISPFASTC. AND. KSTPREAD.GT. ITSFASTC) THEN
+          WRITE(IOUT,354) KPERREAD, ISPFASTC, KSTPREAD,ITSFASTC
+          STOP
+354     FORMAT(10X,'*** TIME STEP IN FILE (KSTPREAD) IS PAST',
+     1    1X,'ITSFASTC ***'/10X,'KPERREAD = ',I7,' ISPFASTC = ',I7,
+     1    ' KSTPREAD =',1X,I7,' ITSFASTC = ',I7)
+        ENDIF
+C
+C4B-----RE-READ FILE IF ISPFASTC AND ITSFASTC ARE NOT REACHED
+       IF(.NOT.(KPERREAD.EQ.ISPFASTC.AND.KSTPREAD.EQ.ITSFASTC))GO TO 333
+C ----------------------------------------------------------------------
+C5------ IF TIME AND STRESS PERIOD NOT FOUND, PRINT ERROR AND STOP
+        IF(KPERREAD.NE. ISPFASTC.AND.KSTPREAD.NE.ITSFASTC) THEN
+          WRITE(IOUT,352) KPERREAD, ISPFASTC, KSTPREAD,ITSFASTC
+          STOP
+        ENDIF
+352     FORMAT(10X,'*** STRESS PERIOD AND TIME STEP NOT FOUND IN FILE',
+     1    1X,'***'/10X,'KPERREAD = ',I7,' ISPFASTC = ',I7,' KSTPREAD =',
+     1    1X,I7,' ITSFASTC = ',I7)
+C ----------------------------------------------------------------------
+      ENDIF
+C ----------------------------------------------------------------------
+C6------CONC ARRAYS ARE UPDATED, CHECK STRESS PERIOD AND TIME STEP
+      IF(KPER.NE.ISPFASTC) THEN
+C6A ------STRESS PERIOD NOT REACHED. FLAG JUMPS TO NEXT STRESS PERIOD
+        IFAST = 2
+        WRITE(IOUT,372)
+372     FORMAT(10X,'*** STRESS PERIOD NOT REACHED, FASTFORWARDING WITH',
+     1   1X,'IFAST = 2 ***' )
+      ELSEIF(KSTP.NE.ITSFASTC)THEN
+C6B ------STRESS PERIOD REACHED, BUT NOT TIME STEP. FLAG JUMPS TO NEXT TIME STEP
+        IFAST = 1
+        WRITE(IOUT,373)
+373     FORMAT(10X,'*** STRESS PERIOD REACHED, BUT TIME STEP NOT',
+     1   1X,'REACHED, FASTFORWARDING WITH IFAST = 1 ***' )
+      ELSE
+C6C ------STRESS PERIOD AND TIME STEP REACHED, SET FLAG THAT F-FORWARD HAS ARRIVED
+        IFAST = 3
+        WRITE(IOUT,374)
+374     FORMAT(10X,'*** STRESS PERIOD AND TIME STEP REACHED',
+     1   1X,'FASTFORWARDING IS DONE. IFAST = 3 ***'/
+     1   10X,'MOVING ON TO NEXT TIME STEP OR STRESS PERIOD')
+      ENDIF
+C--------------------------------------------------------------------------------------
+C7------STOP FAST-FORWARDING ONCE SP AND TS ARE REACHED, AND UPDATE ALL ARRAYS
+      IF(IFAST.EQ.3)THEN
+C8------UPDATE CONC ARRAYS
+        IF(IUNSTR.EQ.0) THEN
+C8A-------FOR STRUCTURED GRID COPY HINI INTO HNEW
+          N=0
+          DO 360 IC=1,NTCOMP
+          DO 360 K=1,NLAY
+          DO 360 I=1,NROW
+          DO 360 J=1,NCOL
+            N=N+1
+            CONCO(N,IC) = CONC(N,IC)
+360       CONTINUE
+        ELSE
+C8B-------FOR UNSTRUCTURED GRID COPY HTEMP1 INTO HNEW
+          DO IC=1,NTCOMP
+          DO N=1,NODES
+            CONCO(N,IC) = CONC(N,IC)
+          ENDDO
+          ENDDO
+        ENDIF
+C
+        IF(INCLN.GT.0)THEN
+C8C-------FOR CLN NODES COPY HTEMP INTO HNEW
+          DO IC=1,NTCOMP
+          DO N=1,NCLNNDS
+            NG = NODES + N
+            CONCO(N,IC) = CONC(N,IC)
+          ENDDO
+          ENDDO
+        ENDIF
+C
+        IF(IDPT.GT.0)THEN
+C8D-------FOR DUAL DOMAIN FLOW GRID COPY HTEMP1IM INTO HNEWIM
+          DO IC=1,NTCOMP
+          DO N=1,NODES
+            CONCOIM(N,IC) = CONCIM(N,IC)
+          ENDDO
+          ENDDO
+        ENDIF
+C
+C        IF(INMDT.GT.0)THEN
+C8D-------FOR MATRIX DIFFUSION GRID COPY HTEMP1MD1, HTEMP1MD2, ETC INTO RESPECTIVE ARRAYS
+C          DO IC=1,NTCOMP
+C          DO N=1,NODES
+CC            ARRAY(N,IC) =  HINI1MD1(N,IC)
+C          ENDDO
+C          ENDDO
+CC          DEALLOCATE (HINI1MD1)
+C        ENDIF
+C -----------------------------------------------------------------------
+C11------IF NOT FIRST TIME STEP THEN CALCULATE TIME STEP LENGTH FOR STANDARD TIME STEPPING.
+        IF(IATS.EQ.0)THEN
+          IF(KSTP.NE.1) DELT=TSMULT(KPER)*DELT
+        ELSE
+          DELT= DELTAT
+c11a -----ACCUMULATE ITIMOT IF NPTIMES IS GREATER THAN ZERO SO POINTER IS SET CORRECTLY
+          IF(NPTIMES.GT.0)THEN
+            DO II = 1 , NPTIMES
+               IF(TOTIMREAD. GT. TIMOTC(II)) THEN
+                 ITIMOTC = II + 1
+               ELSE  ! JUMP OUT OF LOOP
+                 GO TO 554
+               ENDIF
+            ENDDO
+  554       CONTINUE
+          ENDIF
+        ENDIF
+C
+C12------ACCUMULATE ELAPSED TIME IN SIMULATION(TOTIM) AND IN THIS
+C12------STRESS PERIOD(PERTIM).
+        TOTIM=TOTIMREAD
+        PERTIM=PERTIMREAD
+      ENDIF
+C
+C14------RETURN
+      RETURN
+      END
+C -----------------------------------------------------------------------
+      SUBROUTINE GWF2BOOTSTRAPSCALING(KPER,KSTP)
+C     ******************************************************************
+C     READ BTS FILE AND BOOTSTRAP HNEW AND RECOMPUTE SNEW
+C     BOOTSTRAPPING AND SCALING ARE NOT DONE FOR DPF DOMAIN
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY:NODES,HNEW,HOLD,IBOUND,NODES,IOUT
+      USE GWFBASMODULE,ONLY:DELT,IUGBOOT,IBOOT,BOOTSLOPE,BOOTSCALE,
+     *    IBOOTSCALE,DTBOOTSCALE,HREADBOOT  
+      REAL*8 REALSLOPE
+C     ------------------------------------------------------------------
+C
+C1------RETURN IF NOT SCALING (CANNOT SCALE AT START OF SIMULATION)
+      IF(IBOOTSCALE.EQ.0) RETURN
+      IF(KSTP.EQ.1.AND.KPER.EQ.1) RETURN
+C
+C2------COMPUTE REAL SLOPE AND SCALING FACTOR 
+      MXSCALENODE = 0
+      SCALEMAX = 0.0
+      DO N=1,NODES
+        IF(IBOUND(N).EQ.0) CYCLE  
+        REALSLOPE = (HNEW(N) - HOLD(N)) / DTBOOTSCALE
+CSP        HDIF = ABS(HNEW(N)-HREADBOOT(N))
+CSP        IF(ABS(BOOTSLOPE(N)).GT.1.0E-10.AND.HDIF.GT.0.05) THEN 
+        IF(ABS(BOOTSLOPE(N)).GT.1.0E-2) THEN             
+          BOOTSCALE(N) = REALSLOPE / BOOTSLOPE(N)
+        ELSE
+          BOOTSCALE(N) = 1.0  
+        ENDIF
+        if(bootscale(n).gt.2.0) bootscale(n) = 10.0
+        if(bootscale(n).lt.0.5) bootscale(n) = 0.1
+        IF(ABS(BOOTSCALE(N)). GT. SCALEMAX) THEN
+          SCALEMAX = BOOTSCALE(N)
+          MXSCALENODE = N
+        ENDIF
+      ENDDO
+      WRITE(IOUT,6)SCALEMAX,MXSCALENODE
+6     FORMAT(10X,'LARGEST SCALING OF',G15.6,'AT NODE',I10)      
+C
+C3------RETURN
+      RETURN
+      END      
+      SUBROUTINE GWF2BOOTSTRAP(KPER,KSTP)
+C     ******************************************************************
+C     READ BTS (BOOTSTRAPPING) FILE AND BOOTSTRAP HNEW AND RECOMPUTE SNEW
+C     BOOTSTRAPPING NOT DONE FOR DPF DOMAIN (ONLY GWF AND CLN)
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY:NODES,TSMULT,HNEW,HOLD,So,Sn,NEQS,IUNSTR,TOP,BOT,
+     *    IBOUND,iunit,area,iout,NODLAY,NROW,NCOL,NLAY,NODES,IXSEC,
+     *    INCLN,IDPIN,IDPF 
+      USE GWFBASMODULE,ONLY:DELT,TOTIM,PERTIM,IATS,DELTAT,IUGBOOT,
+     *     IUCBOOT,IUDBOOT,IBOOT,IBOOTSCALE,BOOTSCALE,BOOTSLOPE,
+     *     DTBOOTSCALE,HREADBOOT
+      USE GWFBCFMODULE,ONLY:LAYCON
+      USE CLN1MODULE, ONLY: ACLNNDS,NCLNNDS,IFLINCLN      
+      DOUBLE PRECISION, DIMENSION(:),ALLOCATABLE  ::HTMP,HTMPIM
+      SAVE TREAD,TOTIMREAD
+      DOUBLE PRECISION HD,THCK,TOTTHICK,BBOT,TTOP,TOTIMREAD,PERTIMREAD
+     1  ,AHD,TREAD
+      INTEGER KPERREAD,KSTPREAD
+      CHARACTER*16 TEXT
+C     ------------------------------------------------------------------
+C
+C1------IDENTIFY PACKAGE AND READ HEADS FROM BOOTSTRAP FILE FOR THIS TIME
+      IN = IUGBOOT
+      AHD = 0.001
+      WRITE(IOUT,1) IN,KPER,KSTP
+    1 FORMAT(1X,/1X,'BST -- BOOTSTRAPPING SUBROUTINE, VERSION 7',
+     1', 8/26/2015',/,9X,'BOOTSTRAP FILE UNIT IS',I3,
+     2'. ENTER BOOTSTRAPPING SUBROUTINE FOR STRESS PERIOD',
+     3 I6,' TIME STEP',I6)
+C    
+      IGWFHD= IUGBOOT
+      ICLNHD = 0
+      IF(INCLN.NE.0) THEN
+        ICLNHD = IUCBOOT
+      ENDIF
+      IDPFHD = 0
+      IF(IDPF.NE.0) THEN
+        IDPFHD = IUDBOOT
+      ENDIF
+      IDPFHD = 0  !***************** DO NOT READ DPF FILE
+C2------INITIALIZE
+      ALLOCATE(HTMP(NEQS))
+      IF(IDPF.NE.0) THEN
+        ALLOCATE(HTMPIM(NODES))
+      ENDIF
+C  
+      IF(KSTP.EQ.1.AND.KPER.EQ.1)THEN
+C2A-------AT FIRST TIME IN READ BINARY FILE FOR TOTIMREAD AND HTMP  
+25      CONTINUE            
+C        
+        IF(IDPIN.EQ.0)THEN
+          CALL READBIN4 (IGWFHD,ICLNHD,IDPFHD,KPERREAD,KSTPREAD,
+     1      PERTIMREAD,TOTIMREAD,HTMP,HTMPIM)
+        ELSE
+          CALL READBIN8 (IGWFHD,ICLNHD,IDPFHD,KPERREAD,KSTPREAD,
+     1      PERTIMREAD,TOTIMREAD,HTMP,HTMPIM)
+        ENDIF
+C
+        WRITE(IOUT,351)TOTIMREAD
+351     FORMAT(10X,'*** BOOTSTRAP FILE READ FOR TIME = ',G15.6,' ***') 
+        IF(TOTIMREAD.LT.TOTIM - 1.E-4) GO TO 25
+C2B-------AT FIRST TIME IN, BOOTSLOPE = (HTMP - HOLD)/TOTIMREAD AND SAVE HTMPS
+        DO N=1,NEQS
+          HD =  HTMP(N)-HOLD(N)
+          IF(ABS(HD).GT.AHD)THEN
+            BOOTSLOPE(N)=(HD)/TOTIMREAD
+          ELSE
+            BOOTSLOPE(N) = 0.0  
+          ENDIF
+          HREADBOOT(N) = HTMP(N)
+        ENDDO            
+        TREAD = 0.0
+      ELSE
+C
+        write(iout,36)totimread,tread,totim
+36      format('before reading bootstrap file, TOTIMREAD, TREAD',1X,
+     1     'and TOTIM are:' 3G15.8)
+C2C--------DETERMINE IF TIME TO READ NEXT HEAD AND TOTIMREAD RECORD
+cc        IF(TOTIM.GE.TOTIMREAD + 1.E-5)THEN
+        IF(TOTIMREAD.LT.TOTIM - 1.E-4)THEN
+C2D---------SAVE TOTIMREAD INTO PREVIOUSLY READ INDEX TREAD AND
+C2D---------READ BINARY FILE FOR TOTIMREAD AND HTMP
+          TREAD = TOTIMREAD  
+35        CONTINUE              
+C        
+          IF(IDPIN.EQ.0)THEN
+            CALL READBIN4 (IGWFHD,ICLNHD,IDPFHD,KPERREAD,KSTPREAD,
+     1        PERTIMREAD,TOTIMREAD,HTMP,HTMPIM)
+          ELSE
+            CALL READBIN8 (IGWFHD,ICLNHD,IDPFHD,KPERREAD,KSTPREAD,
+     1        PERTIMREAD,TOTIMREAD,HTMP,HTMPIM)
+          ENDIF 
+C
+          write(iout,37)totimread,tread,totim
+37        format('after reading bootstrap file, TOTIMREAD, TREAD',1X,
+     1       'and TOTIM are:' 3G15.8)
+CC          IF(TOTIMREAD.LT.TOTIM-1.0e-5) GO TO 35
+          IF(TOTIMREAD.LT.TOTIM - 1.E-4) GO TO 35 
+C
+C2E---------COMPUTE BOOTSLOPE AND REFRESH TREAD AND HREADBOOT
+          DO N=1,NODES
+            HD = HTMP(N)-HREADBOOT(N)
+            IF(ABS(HD).GT.AHD)THEN
+              BOOTSLOPE(N)=(HD)/(TOTIMREAD-TREAD)
+            ELSE
+              BOOTSLOPE(N) = 0.0  
+            ENDIF
+            HREADBOOT(N) = HTMP(N)
+          ENDDO
+        ENDIF    
+      ENDIF  
+      DEALLOCATE(HTMP)
+      IF(IDPF.NE.0) THEN
+        DEALLOCATE(HTMPIM)
+      ENDIF      
+C   
+C---------------------------------------------------------------------  
+C6-------PERFORM SCALING IF REQUIRED
+      IF(KSTP.EQ.1.AND.KPER.EQ.1) GO TO 10
+      IF(IBOOTSCALE.EQ.0)THEN
+        DO N=1,NODES
+          BOOTSCALE(N) = 1.0
+        ENDDO
+      ENDIF
+10    CONTINUE           
+C ---------------------------------------------------------------------------------------    
+C5------COMPUTE INITIAL HNEW ESTIMATE FROM BOOTSLOPE IF BOOTSTRAPPING THIS STRESS PERIOD.
+      IF(IBOOT.EQ.1)THEN
+        WRITE(IOUT,*)'...BOOTSTRAPPING...' 
+        DO N=1,NODES
+          IF(IBOUND(N).EQ.0) CYCLE
+          HNEW(N)=HOLD(N) + BOOTSLOPE(N) * BOOTSCALE(N) * DELT
+        ENDDO
+      ENDIF   
+      DTBOOTSCALE = DELT
+C---------------------------------------------------------------------
+C6------GET SNEW FOR THIS HNEW
+      DO K=1,NLAY
+        IF(LAYCON(K).GE.4) THEN
+C---------LOOP THROUGH EACH CELL IN LAYER
+          NNDLAY = NODLAY(K)
+          NSTRT = NODLAY(K-1)+1
+          DO N=NSTRT,NNDLAY
+            IF(IBOUND(N).NE.0) THEN
+C-------------CALCULATE SATURATED THICKNESS.
+              HD=HNEW(N)
+              BBOT=BOT(N)
+              TTOP=TOP(N)
+              TOTTHICK = TTOP - BBOT
+              CALL SAT_THIK(N,HD,TOTTHICK,BBOT,THCK,K,TTOP)
+              Sn(N)=THCK
+            ENDIF
+          ENDDO
+        ENDIF
+      ENDDO
+C
+      IF(INCLN.GT.0) THEN
+C7-------SET SNEW FOR CLN-NODES FOR THIS HNEW
+        DO  IFN=1,NCLNNDS
+          N = ACLNNDS(IFN,1)
+          IFLIN = IFLINCLN(IFN)
+          IF(IBOUND(N).NE.0.AND.IFLIN.LE.0) THEN
+C-------------CALCULATE INITIAL SATURATED THICKNESS FOR UNCONFINED CASES.
+            HD=HNEW(N)
+            BBOT = ACLNNDS(IFN,5)
+            CALL CLN_THIK(IFN,HD,BBOT,THCK)
+            Sn(N)=THCK
+          ENDIF
+        ENDDO
+      ENDIF
+C
+C4------RETURN
+      RETURN
+      END
+C -----------------------------------------------------------------------
+      SUBROUTINE SGWF2BAS7STPVAL()
+C     ******************************************************************
+C     CHECK THAT PARAMETER DEFINITIONS ARE COMPLETE.
+C     ******************************************************************
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL,      ONLY: IOUT
+      USE PARAMMODULE, ONLY:NPVAL,PARTYP,PARNAM
+C     ------------------------------------------------------------------
+      IF(NPVAL.LE.0) RETURN
+      IERR=0
+C
+C1------CHECK THAT ALL PARAMETERS IN PARAMETER INPUT FILE HAVE BEEN DEFINED.
+      DO 90 IP=1,NPVAL
+        IF (PARTYP(IP).EQ.' ') THEN
+          IERR = 1
+          WRITE(IOUT,110) PARNAM(IP)
+  110     FORMAT(1X,/,1X,'PARAMETER "',A10,
+     1      '" IN PARAMETER INPUT FILE HAS NOT BEEN DEFINED',/,
+     2           ' -- STOP EXECUTION')
+        ENDIF
+   90 CONTINUE
+C
+      IF(IERR.NE.0) CALL USTOP(' ')
+C
+C2------RETURN.
+      RETURN
+      END
+C -----------------------------------------------------------------------
+      SUBROUTINE ATS1AD(KITER,KSTP,KPER,ICNVG,INOC,ISTOP,ISTRFINKP)
+C     ******************************************************************
+C     SET PRINT FLAGS AND ADVANCE TO MASS BALANCE COMPUTATIONS
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY:IOUT,NLAY,NSTP,IXSEC,IFREFM,ITRNSP,PERLEN,ISSFLG,
+     1    AREA
+      USE SMSMODULE, ONLY: MXITER
+      USE GWFBASMODULE,ONLY:IHDDFL,ISPCFL,IBUDFL,ICBCFL,IPEROC,ITSOC,
+     1    IBDOPT,IOFLG,DELT,DELTAT,PERTIM,TOTIM,
+     2    NPSTPS,NPTIMES,TIMOT,ITIMOT,TMAXAT,TMINAT,TADJAT,TCUTAT,
+     3    IBUDFLAT,ICBCFLAT,IHDDFLAT,ISPCFLAT
+C
+C     ------------------------------------------------------------------
+C
+C1------DETERMINE IF PRINTING IS NEEDED AT THIS TIME
+      IATSPR = 0
+C1A-----PRINT FOR STEADY-STATE STRESS PERIODS
+      IF (ISSFLG(KPER).EQ.1) IATSPR = 1
+C1B-----PRINT EVERY NPSTPS TIMES
+      IF (MOD(KSTP,NPSTPS).EQ.0) IATSPR = 1
+C1C-----PRINT AT END OF STRESS PERIOD
+      IF(ABS(PERTIM-PERLEN(KPER)).LT.TMINAT) IATSPR = 1
+C1D-----PRINT WHEN OUTPUT TIME IS REACHED
+      IF(NPTIMES.GT.0)THEN
+        IF(TOTIM.GE.(TIMOT(ITIMOT) - TMINAT))THEN
+          IATSPR = 1
+          ITIMOT = ITIMOT + 1
+        ENDIF
+      ENDIF
+C1E-----PRINT WHEN TR to SS HAS ACHIEVED SS AND SET STRESS PERIOD TO FINISH
+      IF(ISTRFINKP. EQ.2) THEN 
+        IATSPR = 1
+        ISTRFINKP = 3
+        WRITE(IOUT,18) KSTP,KPER
+   18   FORMAT(1X,/11X,'****TRANSIENT REACHED STEADY-STATE CONDITION',
+     1    ' AT TIME STEP',I5,' FOR STRESS PERIOD ',I5,'****') 
+      ENDIF    
+C2------SET FLAGS IF PRINTING
+      IBUDFL = IBUDFLAT
+      ICBCFL = 0
+      IHDDFL = 0
+      IF(ITRNSP.NE.0) ISPCFL = 0
+      IF(IATSPR.EQ.1) THEN
+        ICBCFL = ICBCFLAT
+        IHDDFL = IHDDFLAT
+        IF(ITRNSP.NE.0)THEN
+          ISPCFL = ISPCFLAT
+        ENDIF
+      ENDIF
+C
+C3-------RETURN.
+      RETURN
+      END
+C -----------------------------------------------------------------------
+      SUBROUTINE ATS1AJ(KITER,KSTP,KPER,ICNVG,INOC,ISTRFIN,ISTOP,
+     1  INEVT,INRCH,INFHB,INQRT)
+C     ******************************************************************
+C     READ RTS/ETS AND ADJUST RECH/EVTR AS NEEDED
+C     AND SET NEW DELTAT FOR ADAPTIVE TIME STEPPING
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY:IOUT,NLAY,NSTP,IXSEC,IFREFM,ITRNSP,PERLEN,ISSFLG,
+     1    AREA
+      USE SMSMODULE, ONLY: MXITER
+      USE GWFBASMODULE,ONLY:IHDDFL,ISPCFL,IBUDFL,ICBCFL,IPEROC,ITSOC,
+     1    IBDOPT,IOFLG,DELT,DELTAT,PERTIM,TOTIM,IFRCNVG,
+     2    NPSTPS,NPTIMES,TIMOT,ITIMOT,TMAXAT,TMINAT,TADJAT,TCUTAT,
+     3    IBUDFLAT,ICBCFLAT,IHDDFLAT
+      USE GWFRCHMODULE, ONLY: INRTS,tstartrch,tendrch,factrrch,rtsrch,
+     1   IZNRCH,RECH,TIMRCH,irch,IRTSRD,inirch,MXZNRCH,IRTSOPT,RECHSV
+      USE GWFEVTMODULE, ONLY: INETS,tstartevt,tendevt,factrevt,etsevt,
+     1   IZNEVT,EVTR,TIMEVT,ievt,IETSRD,inievt,MXZNEVT,IETSOPT
+      USE GWFFHBMODULE,ONLY: TIMFHB,ISFHBOPT
+      USE GWFQRTMODULE, ONLY: TIMQRT,ISTEPQ
+C
+C     ------------------------------------------------------------------
+C
+C------------------------------------------------------------------------
+C4------READ NEXT LINE OF RTS IF FLAG IS ON AND SET RECHARGE
+C------------------------------------------------------------------------
+      IF(INRCH.GT.0)THEN
+      IF(IRTSRD.EQ.1)THEN
+C4B-----------READ NEXT LINE OF RTS FILE
+        read(inrts,*)tstartrch,tendrch,factrrch,(rtsrch(i),i=1,mxznrch)
+        write(iout,2)tstartrch,tendrch,factrrch,(rtsrch(i),i=1,mxznrch)
+2       format(/2x,'*** RTS read - Tstart, Tend, Factor, Rts(mxznrch)'/
+     1     5x,200g15.7)
+        IF(tstartrch. GT. TOTIM)THEN
+C4C----------ACCOMMODATE ZERO-RECHARGE GAP IN DATA FROM PREVIOUS TENDRCH
+          TIMRCH = tstartrch
+          DO I=1,MXZNRCH
+            RTSRCH(I) = 0.0
+          ENDDO
+          DO NN=1,INIRCH
+            RECH(NN) = RECHSV(NN)
+          ENDDO
+          BACKSPACE(INRTS)
+          WRITE(IOUT,3)TSTARTRCH,TOTIM
+3         FORMAT(2X,'*** ZERO RECHARGE APPLIED FROM RTS SINCE ',1X,
+     1    'TSTARTRCH',G15.6,', IS LARGER THAN CURRENT TOTIM',G15.6,
+     2    '. ***')
+        ELSE
+C4D----------SET TIMRCH FOR NEXT RECORD IN RTS FILE AND FILL RECH ARRAY WITH RTS DATA
+          TIMRCH = TENDRCH
+          DO 52 NN=1,INIRCH
+            N = IRCH(NN)
+            izr = iznrch(n)
+            if(izr.ge.1.and.izr.le.mxznrch)
+     *      RECH(NN)=RECHSV(NN) + rtsrch(izr)*AREA(N)*factrrch
+   52     CONTINUE
+          WRITE(IOUT,4)
+4         FORMAT(2X,'*** RECH ARRAY UPDATED FROM RTS FILE FOR USE ',
+     1           'IN THE FOLLOWING TIME STEP***')
+        ENDIF
+        IRTSRD = 0
+      ENDIF
+      ENDIF
+C------------------------------------------------------------------------
+C5------READ NEXT LINE OF ETS IF FLAG IS ON AND SET ET
+C------------------------------------------------------------------------
+      IF(INEVT.GT.0)THEN
+      IF(IETSRD.EQ.1)THEN
+C5A-----------READ NEXT LINE OF ETS FILE
+        read(inets,*)tstartevt,tendevt,factrevt,(etsevt(i),i=1,mxznevt)
+        write(iout,5)tstartevt,tendevt,factrevt,(etsevt(i),i=1,mxznevt)
+5       format(2x,'*** ETS read - Tstart, Tend, Factor, Ets(mxznevt)'/
+     1     5x,200g15.7)
+        IF(tstartevt. GT. TOTIM)THEN
+C5C----------ACCOMMODATE ZERO-ET GAP IN DATA FROM PREVIOUS TENDEVT
+          TIMEVT = tstartevt
+          DO I=1,MXZNEVT
+            ETSEVT(I) = 0.0
+          ENDDO
+          DO NN=1,INIEVT
+            EVTR(NN) = 0.0
+          ENDDO
+          BACKSPACE(INETS)
+          WRITE(IOUT,6)TSTARTEVT,TOTIM
+6         FORMAT(2X,'*** ZERO ET APPLIED FROM ETS SINCE ',1X,
+     1      'TSTARTEVT',G15.6,', IS LARGER THAN TOTIM',G15.6,'. ***')
+        ELSE
+C5D----------SET TIMEVT FOR NEXT RECORD IN ETS FILE AND FILL EVTR ARRAY WITH ETS DATA
+          TIMEVT = TENDEVT
+          DO 53 NN=1,INIEVT
+            N = IEVT(NN)
+            ize = iznevt(n)
+            if(ize.ge.1.and.ize.le.mxznevt)
+     *      EVTR(NN) = etsevt(ize)*AREA(N)*factrevt
+   53     CONTINUE
+          WRITE(IOUT,7)
+7         FORMAT(2X,'*** EVTR ARRAY UPDATED FROM ETS FILE ***')
+        ENDIF
+        IETSRD = 0
+      ENDIF
+      ENDIF
+C------------------------------------------------------------------------
+C6------SET DELTAT FOR NEXT TIME STEP
+C------------------------------------------------------------------------
+C6A-----ADJUST DELTAT FOR CONVERGENCE - BUT NOT WHEN FORCING CONVERGENCE
+      IF(IFRCNVG.EQ.1.AND.KITER.EQ.MXITER)THEN
+        DELTAT = DELT*TADJAT
+      ELSEIF(ISSFLG(KPER).EQ.1) THEN
+        DELTAT = DELT*TADJAT  
+      ELSE    
+        IF(KITER.LE.INT(MXITER/3)) THEN
+          DELTAT=DELT*TADJAT
+        ELSEIF(KITER.GT.INT(2*MXITER/3)) THEN
+          DELTAT=DELT/TADJAT
+        ELSE
+          DELTAT=DELT
+        ENDIF
+      ENDIF
+C6B-----ADJUST DELTAT IF IT IS LARGER THAN TMAXAT
+      IF(DELTAT.GT.TMAXAT)THEN
+        DELTAT = TMAXAT
+      ENDIF
+C6C-----ADJUST DELTAT IF NEW TIME IS WITHIN TMINAL OF PRINT TIME AND KSTP > 1
+      IF(NPTIMES.GT.0)THEN
+        IF(KSTP.GT.1.AND.(TOTIM+DELTAT).GT.TIMOT(ITIMOT)-TMINAT)THEN
+          DELTAT = TIMOT(ITIMOT) - TOTIM
+        ENDIF
+      ENDIF
+C6D-----ADJUST DELTAT IF NEW TIME IS WITHIN TMINAL OF TIMRCH IF RTS IS ON
+      IF(INRCH.GT.0)THEN
+        IF(IRTSOPT.GT.0)THEN
+          IF( (TOTIM+DELTAT) .GT. (TIMRCH-TMINAT) )THEN
+            DELTAT = TIMRCH - TOTIM
+            IRTSRD = 1 ! SET FLAG TO READ RTS ARRAY AFTER NEXT STEP
+          ENDIF
+        ENDIF
+      ENDIF
+C6E-----ADJUST DELTAT IF NEW TIME IS WITHIN TMINAL OF TIMEVT IF ETS IS ON
+      IF(INEVT.GT.0)THEN
+        IF(IETSOPT.GT.0)THEN
+          IF( (TOTIM+DELTAT) .GT. (TIMEVT-TMINAT) )THEN
+            DELTAT = TIMEVT - TOTIM
+            IETSRD = 1 ! SET FLAG TO READ ETS ARRAY AFTER NEXT STEP
+          ENDIF
+        ENDIF
+      ENDIF
+C6F-----ADJUST DELTAT IF NEW TIME IS WITHIN TMINAL OF TIMFHB IF STAIRCASE OPTION IS ON
+      IF(INFHB.GT.0)THEN
+        IF(ISFHBOPT.GT.0)THEN
+          IF( (TOTIM+DELTAT) .GT. (TIMFHB-TMINAT) )THEN
+            DELTAT = TIMFHB - TOTIM
+          ENDIF
+        ENDIF
+      ENDIF
+C6G-----ADJUST DELTAT IF NEW TIME IS WITHIN TMINAL OF TIMQRT IF STAIRCASE OPTION IS ON
+      IF(INQRT.GT.0)THEN
+        IF(ISTEPQ.GT.0)THEN
+          IF( (TOTIM+DELTAT) .GT. (TIMQRT-TMINAT) )THEN
+            DELTAT = TIMQRT - TOTIM
+          ENDIF
+        ENDIF
+      ENDIF
+C-----------------------------------------------------------------------------
+C7------AT END OF STRESS PERIOD SET FLAG ISTRFIN AND RETURN
+      IF(ABS(PERTIM-PERLEN(KPER)).LT.TMINAT) THEN
+        ISTRFIN = 1
+        RETURN
+      ENDIF
+C-----------------------------------------------------------------------------
+C8------FINALLY ADJUST DELTAT AND SET FLAGS IF NEW TIME IS WITHIN TMINAL OF PERLEN
+      IF((PERTIM+DELTAT).GT.PERLEN(KPER)-TMINAT)THEN
+        DELTAT = PERLEN(KPER) - PERTIM
+      ENDIF
+C------------------------------------------------------------------------
+C9------CHECK IF DELTAT IS LESS THAN TMINAT AND SET STOP FLAG
+      IF(DELTAT.LT.TMINAT) ISTOP = 1
+C
+C10------RETURN.
+      RETURN
+      END
+C -----------------------------------------------------------------------
+      SUBROUTINE ATS1CT(KITER,KSTP,KPER,ICNVG,INOC,ISTOP,INEVT,INRCH)
+C     ******************************************************************
+C     CUT TIME STEP SIZE FOR NONCONVERGED SOLUTION AND RESET PARAMETER VECTORS
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY:IOUT,NLAY,NSTP,IXSEC,IFREFM,ITRNSP,PERLEN,
+     1    HNEW,HOLD,SN,SO,NEQS,ISSFLG
+      USE GWFBASMODULE,ONLY:IHDDFL,ISPCFL,IBUDFL,ICBCFL,IPEROC,ITSOC,
+     1                      IBDOPT,IOFLG,DELT,DELTAT,PERTIM,TOTIM,
+     2                      NPSTPS,NPTIMES,TIMOT,ITIMOT,TMINAT,TCUTAT
+      USE GWFRCHMODULE, ONLY: IRTSRD
+      USE GWFEVTMODULE, ONLY: IETSRD
+C
+C     ------------------------------------------------------------------
+C
+C1-----PRINT TIME SUMMARY FOR NONCONVERGED SOLUTION
+      WRITE(IOUT,10) DELT,KSTP,KPER
+10    FORMAT(/10X,'**** NONLINEAR ITERATIONS DID NOT CONVERGE FOR DELT',
+     1  ' =',G12.4,  ' IN TIME STEP ',I5,' OF STRESS PERIOD',I7,' ****')
+C------------------------------------------------------------------------
+C2------RESET DELTAT AND TIME VALUES TO REATTEMPT THIS TIME STEP
+      DELTAT=DELT/TCUTAT
+      TOTIM = TOTIM - DELT
+      PERTIM = PERTIM - DELT
+      TOTIMWR = TOTIM + DELTAT
+      PERTIMWR = PERTIM + DELTAT
+      WRITE(IOUT,11) DELTAT,TOTIMWR,PERTIMWR
+11    FORMAT(/10X,'**** REDUCING TIME STEP SIZE TO DELT = ',G12.4,
+     1  ', NEW TOTIM IS =',G12.4,  ', NEW PERTIM IS = ',G12.4,' ****')
+C------------------------------------------------------------------------
+C3------RESET HEAD AND SATURATION VECTORS FROM OLD VALUES
+      DO N=1,NEQS
+        HNEW(N) = HOLD(N)
+        SN(N) = SO(N)
+      ENDDO
+C------------------------------------------------------------------------
+C4------SET STOP FLAG IF STEADY STATE RUN DID NOT CONVERGE
+C4------OR IF DELTAT IS LESS THAN TMINAT
+      ISS = ISSFLG(KPER)
+      IF(DELTAT.LT.TMINAT. OR. ISS.EQ.1) THEN
+        ISTOP = 1
+C5-----PRINT BUDGET AND HEADS FOR NONCONVERGED SOLUTION
+        IBUDFL = 1
+        ICBCFL = 0
+        IHDDFL = 1
+      ENDIF
+C6-------SHUT OFF FLAG TO READ RTS AND ETS FILES, IF ON
+      IF(INRCH.GT.0)THEN
+        IRTSRD=0
+      ENDIF
+      IF(INEVT.GT.0)THEN
+        IETSRD=0
+      ENDIF
+C
+C7------RETURN.
+      RETURN
+      END
+C -----------------------------------------------------------------------
+      SUBROUTINE GWF2BAS7OC(KSTP,KPER,ICNVG,INOC)
+C     ******************************************************************
+C     OUTPUT CONTROLLER FOR HEAD, DRAWDOWN, AND BUDGET
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL,      ONLY:IOUT,NLAY,NSTP,IXSEC,IFREFM,ITRNSP
+      USE GWFBASMODULE,ONLY:IHDDFL,ISPCFL,IBUDFL,ICBCFL,IPEROC,ITSOC,
+     1                      IBDOPT,IOFLG,IATS
+C
+C     ------------------------------------------------------------------
+C
+C1------TEST UNIT NUMBER (INOC (INOC=IUNIT(12))) TO SEE IF
+C1------OUTPUT CONTROL IS ACTIVE.  IF NOT, SET DEFAULTS AND RETURN.
+      IF(INOC.LE.0) THEN
+         IHDDFL=0
+         IF(ICNVG.EQ.0 .OR. KSTP.EQ.NSTP(KPER))IHDDFL=1
+         IBUDFL=0
+         IF(ICNVG.EQ.0 .OR. KSTP.EQ.NSTP(KPER))IBUDFL=1
+         ICBCFL=0
+         IF(ITRNSP.NE.0)THEN
+            ISPCFL=0
+            IF(KSTP.EQ.NSTP(KPER))ISPCFL=1
+         ENDIF
+         GO TO 1000
+      END IF
+C
+C2------OUTPUT CONTROL IS ACTIVE. IF IPEROC >= 0,
+C2------READ ADAPTIVE TIME STEPPING PARAMETERS AND OUTPUT FLAGS USING ALPHABETIC INPUT STRUCTURE.
+      IF(IPEROC.GE.0) THEN
+         CALL SGWF2BAS7N(KPER,KSTP,INOC,IOUT,NLAY)
+         GO TO 600
+      END IF
+C
+C3------IF IATS>0, READ ADAPTIVE TIME STEPPING PARAMETERS
+      IF(IATS.GT.0)CALL ATS1RP(KPER,INOC,IOUT)
+C
+C4------READ AND PRINT OUTPUT FLAGS AND CODE FOR DEFINING IOFLG USING
+C4------THE ORIGINAL NUMERIC INPUT STRUCTURE.
+      IF(ITRNSP.EQ.0)THEN
+        IF(IFREFM.EQ.0) THEN
+         READ(INOC,'(4I10)') INCODE,IHDDFL,IBUDFL,ICBCFL
+        ELSE
+         READ(INOC,*) INCODE,IHDDFL,IBUDFL,ICBCFL
+        END IF
+        WRITE(IOUT,3) IHDDFL,IBUDFL,ICBCFL
+    3   FORMAT(1X,/1X,'HEAD/DRAWDOWN PRINTOUT FLAG =',I2,
+     1    5X,'TOTAL BUDGET PRINTOUT FLAG =',I2,
+     2   /1X,'CELL-BY-CELL FLOW TERM FLAG =',I2)
+      ELSE
+        IF(IFREFM.EQ.0) THEN
+         READ(INOC,'(5I10)') INCODE,IHDDFL,IBUDFL,ICBCFL,ISPCFL
+        ELSE
+         READ(INOC,*) INCODE,IHDDFL,IBUDFL,ICBCFL,ISPCFL
+        END IF
+       WRITE(IOUT,4) IHDDFL,IBUDFL,ICBCFL,ISPCFL
+    4   FORMAT(1X,/1X,'HEAD/DRAWDOWN PRINTOUT FLAG =',I2,
+     1    5X,'TOTAL BUDGET PRINTOUT FLAG =',I2,
+     2   /1X,'CELL-BY-CELL FLOW TERM FLAG =',I2,
+     3   /1X,'CONCENTRATION PRINTOUT FLAG =',I2)
+      ENDIF
+      if(icbcfl.eq.2) ibdopt = 2
+      IF(ICBCFL.NE.0) ICBCFL=IBDOPT
+C
+C4------DECODE INCODE TO DETERMINE HOW TO SET FLAGS IN IOFLG.
+      IF(INCODE.LT.0) THEN
+C
+C5------INCODE <0, USE IOFLG FROM LAST TIME STEP.
+        WRITE(IOUT,101)
+  101   FORMAT(1X,'REUSING PREVIOUS VALUES OF IOFLG')
+      ELSE IF(INCODE.EQ.0) THEN
+C
+C6------INCODE=0, READ IOFLG FOR LAYER 1 AND ASSIGN SAME TO ALL LAYERS
+        IF(ITRNSP.EQ.0)THEN
+          IF(IFREFM.EQ.0) THEN
+           READ(INOC,'(4I10)') (IOFLG(1,M),M=1,4)
+          ELSE
+           READ(INOC,*) (IOFLG(1,M),M=1,4)
+          END IF
+          IOFLG(1,7)=0
+          DO 210 K=1,NLAY
+            IOFLG(K,1)=IOFLG(1,1)
+            IOFLG(K,2)=IOFLG(1,2)
+            IOFLG(K,3)=IOFLG(1,3)
+            IOFLG(K,4)=IOFLG(1,4)
+            IOFLG(K,7)=IOFLG(1,7)
+  210     CONTINUE
+          WRITE(IOUT,211) (IOFLG(1,M),M=1,4)
+  211     FORMAT(1X,/1X,'OUTPUT FLAGS FOR ALL LAYERS ARE THE SAME:'/
+     1     1X,'  HEAD    DRAWDOWN  HEAD  DRAWDOWN'/
+     2     1X,'PRINTOUT  PRINTOUT  SAVE    SAVE'/
+     3     1X,34('-')/1X,I5,I10,I8,I8)
+       ELSE
+         IF(IFREFM.EQ.0) THEN
+           READ(INOC,'(6I10)') (IOFLG(1,M),M=1,6)
+          ELSE
+           READ(INOC,*) (IOFLG(1,M),M=1,6)
+          END IF
+          IOFLG(1,7)=0
+          DO 212 K=1,NLAY
+          IOFLG(K,1)=IOFLG(1,1)
+          IOFLG(K,2)=IOFLG(1,2)
+          IOFLG(K,3)=IOFLG(1,3)
+          IOFLG(K,4)=IOFLG(1,4)
+          IOFLG(K,5)=IOFLG(1,5)
+          IOFLG(K,6)=IOFLG(1,6)
+          IOFLG(K,7)=IOFLG(1,7)
+  212     CONTINUE
+          WRITE(IOUT,213) (IOFLG(1,M),M=1,6)
+  213     FORMAT(1X,/1X,'OUTPUT FLAGS FOR ALL LAYERS ARE THE SAME:'/
+     1     1X,'  HEAD    DRAWDOWN  HEAD  DRAWDOWN    CONC    CONC'/
+     2     1X,'PRINTOUT  PRINTOUT  SAVE    SAVE    PRINTOUT  SAVE'/
+     3     1X,51('-')/1X,I5,I10,I8,I8,I8,I8)
+       ENDIF
+      ELSE
+C
+C7------INCODE>0, READ IOFLG IN ENTIRETY -- IF CROSS SECTION, READ ONLY
+C7------ONE VALUE.
+        MM = 4
+        IF(ITRNSP.NE.0) MM = 6
+        IF(IXSEC.EQ.0) THEN
+           DO 301 K=1,NLAY
+           IF(IFREFM.EQ.0) THEN
+              READ(INOC,'(5I10)') (IOFLG(K,M),M=1,MM)
+           ELSE
+              READ(INOC,*) (IOFLG(K,M),M=1,MM)
+           END IF
+           IF(MM.EQ.4) IOFLG(K,7)=0
+  301      CONTINUE
+           IF(MM.EQ.4)THEN
+             WRITE(IOUT,302) 'OUTPUT FLAGS FOR EACH LAYER:','LAYER'
+  302        FORMAT(1X,/1X,A,/
+     1       1X,'         HEAD    DRAWDOWN  HEAD  DRAWDOWN'/
+     2       1X,A,'  PRINTOUT  PRINTOUT  SAVE    SAVE'/
+     3       1X,41('-'))
+             WRITE(IOUT,303) (K,(IOFLG(K,M),M=1,MM),K=1,NLAY)
+  303        FORMAT(1X,I4,I8,I10,I8,I8)
+           ELSE
+             WRITE(IOUT,305) 'OUTPUT FLAGS FOR EACH LAYER:','LAYER'
+  305        FORMAT(1X,/1X,A,/
+     1       1X,'       HEAD    DRAWDOWN  HEAD  DRAWDOWN   CONC   CONC'/
+     2       1X,A,' PRINTOUT  PRINTOUT  SAVE    SAVE PRINTOUT    SAVE'/
+     3       1X,41('-'))
+             WRITE(IOUT,306) (K,(IOFLG(K,M),M=1,MM),K=1,NLAY)
+  306        FORMAT(1X,I4,I8,I10,I8,I8,I7,I7)
+           ENDIF
+        ELSE
+           IF(IFREFM.EQ.0) THEN
+              READ(INOC,'(6I10)') (IOFLG(1,M),M=1,MM)
+           ELSE
+              READ(INOC,*) (IOFLG(1,M),M=1,MM)
+           END IF
+           WRITE(IOUT,302) 'OUTPUT FLAGS FOR CROSS SECTION:','     '
+           WRITE(IOUT,304) (IOFLG(1,M),M=1,MM)
+  304      FORMAT(1X,I12,I10,I8,I8,I8,I8)
+        END IF
+      END IF
+C
+C8------THE LAST STEP IN A STRESS PERIOD AND STEPS WHERE ITERATIVE
+C8------PROCEDURE FAILED TO CONVERGE GET A VOLUMETRIC BUDGET.
+  600 IF(ICNVG.EQ.0 .OR. KSTP.EQ.NSTP(KPER)) IBUDFL=1
+C
+C9------RETURN
+ 1000 RETURN
+C
+      END
+      SUBROUTINE GWF2TIB1RP(IN,INBCT)
+C     ******************************************************************
+C     READ TRANSIENT IBOUND PACKAGE DATA FOR STRESS PERIOD
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL,      ONLY:IOUT,IFREFM,IUNSTR,IBOUND,HNEW,IA,JA,
+     1                      NODETIBH,NIB1,HTIB,HOLD,BOT,Sn,TOP,NODLAY,
+     1                      NLAY,NODES
+      USE GWFBASMODULE, ONLY: HNOFLO
+      USE GWTBCTMODULE, ONLY: ICBUND,CONC,CINACT,MCOMP,CONCO,NODETIBC,
+     1                        NICB1,CTIB
+      USE SMSMODULE,    ONLY: ISOLVEACTIVE
+      INTEGER, DIMENSION(:),ALLOCATABLE  ::ITEMP
+      DOUBLE PRECISION, ALLOCATABLE :: CONCTMP(:)
+      DOUBLE PRECISION HTMP,TTOP,BBOT,TOTTHICK,THCK
+C
+      CHARACTER*24 ANAME
+      CHARACTER(LEN=200) line
+C
+      DATA ANAME /'     ZEROED IBOUND CELLS'/
+C     ------------------------------------------------------------------
+      ALLOCATE(NIB1)
+      ALLOCATE(NICB1)
+      IF(INBCT.GT.0) THEN
+        IF(.NOT.ALLOCATED(CONCTMP)) ALLOCATE(CONCTMP(MCOMP))
+      ENDIF
+C
+C1------IDENTIFY PACKAGE.
+      WRITE(IOUT,1)IN
+    1 FORMAT(1X,/1X,'TIB -- TRANSIENT IBOUND PACKAGE, VERSION 1, ',
+     1' 12/24/2012, INPUT READ FROM UNIT ',I4)
+C2------READ FIRST LINE
+      CALL URDCOM(In, Iout, line)
+      LLOC = 1
+C3------READ FLAGS
+      IF(IFREFM.EQ.0)THEN
+        IF(INBCT.GT.0) THEN
+          READ(LINE,'(6I10)') NIB0,NIB1,NIBM1,NICB0,NICB1,NICBM1
+        ELSE
+          READ(LINE,'(3I10)') NIB0,NIB1,NIBM1
+        ENDIF
+      ELSE
+        CALL URWORD(line, lloc, istart, istop, 2, NIB0, r, Iout, In)
+        CALL URWORD(line, lloc, istart, istop, 2, NIB1, r, Iout, In)
+        CALL URWORD(line, lloc, istart, istop, 2, NIBM1, r, Iout, In)
+        IF(INBCT.GT.0) THEN
+          CALL URWORD(line, lloc, istart, istop, 2, NICB0, r, Iout, In)
+          CALL URWORD(line, lloc, istart, istop, 2, NICB1, r, Iout, In)
+          CALL URWORD(line, lloc, istart, istop, 2, NICBM1, r, Iout, In)
+        ENDIF
+      END IF
+C------------------------------------------------------------------------
+C4------CHECK IF IBOUND IS TO BE ZEROED OUT.
+      IF(NIB0.LE.0) THEN
+C
+C4A-----NIB0=<0, SO NO CELLS INACTIVATED.
+        WRITE(IOUT,3)
+    3   FORMAT(1X,/1X,'NO CELLS INACTIVATED FROM LAST STRESS PERIOD')
+      ELSE
+C
+C4B-----NIB0>0, SO READ LIST OF INACTIVATED CELLS AND SET IBOUND TO ZERO
+        ALLOCATE (ITEMP(NIB0))
+        CALL U1DINT(ITEMP,ANAME,NIB0,0,IN,IOUT)
+        DO I=1,NIB0
+          ICELL = ITEMP(I)
+          IBOUND(ICELL) = 0
+          HNEW(ICELL) = HNOFLO
+        ENDDO
+        DEALLOCATE(ITEMP)
+      ENDIF
+C------------------------------------------------------------------------
+C5------CHECK IF IBOUND IS TO BE ACTIVATED.
+      IF(NIB1.LE.0) THEN
+C
+C5A-----NIB1=<0, SO NO CELLS ACTIVATED.
+        WRITE(IOUT,4)
+4       FORMAT(1X,/1X,'NO CELLS ACTIVATED FROM LAST STRESS PERIOD')
+      ELSE
+C
+C5B-----NIB1>0, SO READ LIST OF ACTIVATED CELLS AND SET IBOUND TO 1
+        IF(ALLOCATED(NODETIBH)) DEALLOCATE(NODETIBH)
+        IF(ALLOCATED(HTIB)) DEALLOCATE(HTIB)
+        ALLOCATE(NODETIBH(NIB1))
+        ALLOCATE(HTIB(NIB1))
+        DO IB=1,NIB1
+C5C-------READ CELL NUMBER
+          CALL URDCOM(In, Iout, line)
+          LLOC = 1
+          IF(IFREFM.EQ.0)THEN
+            READ(LINE,'(I10)') ICELL
+            LLOC = 11
+          ELSE
+            CALL URWORD(line, lloc, istart, istop, 2, ICELL, r,Iout, In)
+          END IF
+          NODETIBH(IB)=ICELL
+C5D--------GET OPTIONS
+          IAVHEAD=0
+          IHEAD = 0
+          CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,I,R,IOUT,IN)
+          IF(LINE(ISTART:ISTOP).EQ.'HEAD') THEN
+C5D1---------READ KEYWORD OPTION FOR HEAD TO BE READ.
+            IHEAD = 1
+            CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,HEAD,IOUT,IN)
+          ELSEIF(LINE(ISTART:ISTOP).EQ.'AVHEAD') THEN
+C5D2----------READ KEYWORD OPTION FOR AVERAGE HEAD TO BE READ.
+             IAVHEAD=1
+          ENDIF
+C5E-----------SET IBOUND AND HEADS
+          IBOUNDKP = IBOUND(ICELL)
+          IF(IBOUNDKP. GT. 0) CYCLE  ! IF ALREADY ACTIVE THEN JUST MOVE ON 
+          IBOUND(ICELL) = 1
+          IF(IHEAD.EQ.1)THEN
+C5E1--------HEAD IS SET TO GIVEN VALUE
+            HNEW(ICELL) = HEAD
+            IF (ICELL.LE.NODES) THEN
+              BBOT=BOT(ICELL)
+              TTOP=TOP(ICELL)
+              TOTTHICK = TTOP - BBOT
+              DO K=1,NLAY
+                NNDLAY = NODLAY(K)
+                NSTRT = NODLAY(K-1)+1
+                IF(ICELL.GE.NSTRT.AND.ICELL.LE.NNDLAY)THEN
+                  KK = K
+                  GO TO 101
+                ENDIF
+              ENDDO
+101           CONTINUE
+              CALL SAT_THIK(ICELL,HNEW(ICELL),TOTTHICK,BBOT,THCK,K,TTOP)
+	        Sn(ICELL)=THCK
+c            IF(IBOUNDKP.EQ.0) HOLD(ICELL)=BOT(ICELL)
+            ELSE
+CC              Sn(ICELL) = 1.0
+            ENDIF
+          ELSEIF(IAVHEAD.EQ.1)THEN
+C5E2--------HEAD IS SET TO AVERAGE OF CONNECTING ACTIVE CELLS
+            HEAD = 0.0
+            ISUM = 0
+            DO I=IA(ICELL)+1,IA(ICELL+1)-1
+              JJ = JA(I)
+              IF(IBOUND(JJ).NE.0) THEN
+                HEAD = HEAD + HNEW(JJ)
+                ISUM = ISUM + 1
+              ENDIF
+            ENDDO
+            HEAD = HEAD / ISUM
+            HNEW(ICELL) = HEAD
+            IF (ICELL.LE.NODES) THEN
+              BBOT=BOT(ICELL)
+              TTOP=TOP(ICELL)
+              TOTTHICK = TTOP - BBOT
+              DO K=1,NLAY
+                NNDLAY = NODLAY(K)
+                NSTRT = NODLAY(K-1)+1
+                IF(ICELL.GE.NSTRT.AND.ICELL.LE.NNDLAY)THEN
+                  KK = K
+                  GO TO 102
+                ENDIF
+              ENDDO
+102           CONTINUE
+              CALL SAT_THIK(ICELL,HNEW(ICELL),TOTTHICK,BBOT,THCK,K,TTOP)
+	        Sn(ICELL)=THCK
+c            IF(IBOUNDKP.EQ.0) HOLD(ICELL)=BOT(ICELL)
+            ELSE
+CC              Sn(ICELL) = 1.0
+            ENDIF
+          ELSE
+C5E3--------CHECK TO SEE IF NODE WAS PREVIOUSLY INACTIVE
+            IF(IBOUNDKP.EQ.0)THEN
+              WRITE(IOUT,11)ICELL
+11            FORMAT(1X,'*** NEED TO SET HEAD IF INACTIVE CELL IS MADE'
+     1        1X,'ACTIVE FOR CELL ',I9,', STOPPING ***')
+              STOP
+            ENDIF
+          ENDIF
+          HTIB(IB)=HNEW(ICELL)
+        ENDDO
+      ENDIF
+C------------------------------------------------------------------------
+C6------CHECK IF IBOUND IS TO BE MADE MINUS ONE (PRESCRIBED HEAD).
+      IF(NIBM1.LE.0) THEN
+C
+C6A-----NIBM1=<0, SO NO CELLS MADE PRESCRIBED HEAD.
+        WRITE(IOUT,5)
+5       FORMAT(/1X,'NO CELLS PRESCRIBED HEAD FROM LAST STRESS PERIOD')
+      ELSE
+C
+C6B-----NIBM1>0, SO READ LIST OF PRESCRIBED HEAD CELLS AND SET IBOUND TO -1
+        DO IB=1,NIBM1
+C6C-------READ CELL NUMBER
+          CALL URDCOM(In, Iout, line)
+          LLOC = 1
+          IF(IFREFM.EQ.0)THEN
+            READ(LINE,'(I10)') ICELL
+            LLOC = 11
+          ELSE
+            CALL URWORD(line, lloc, istart, istop, 2, ICELL, r,Iout, In)
+          END IF
+C6D--------GET OPTIONS
+          IAVHEAD=0
+          IHEAD = 0
+          CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,I,R,IOUT,IN)
+          IF(LINE(ISTART:ISTOP).EQ.'HEAD') THEN
+C6D1---------READ KEYWORD OPTION FOR HEAD TO BE READ.
+            IHEAD = 1
+            CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,HEAD,IOUT,IN)
+          ELSEIF(LINE(ISTART:ISTOP).EQ.'AVHEAD') THEN
+C6D2----------READ KEYWORD OPTION FOR AVERAGE HEAD TO BE READ.
+             IAVHEAD=1
+          ENDIF
+C6E-----------SET IBOUND AND HEADS
+          IBOUNDKP = IBOUND(ICELL)
+          IBOUND(ICELL) = -1
+          IF(IHEAD.EQ.1)THEN
+C6E1--------HEAD IS SET TO GIVEN VALUE
+            HNEW(ICELL) = HEAD
+            IF(ICELL.LE.NODES)THEN
+              BBOT=BOT(ICELL)
+              TTOP=TOP(ICELL)
+              TOTTHICK = TTOP - BBOT
+              DO K=1,NLAY
+                NNDLAY = NODLAY(K)
+                NSTRT = NODLAY(K-1)+1
+                IF(ICELL.GE.NSTRT.AND.ICELL.LE.NNDLAY)THEN
+                  KK = K
+                  GO TO 103
+                ENDIF
+              ENDDO
+103           CONTINUE
+              CALL SAT_THIK(ICELL,HNEW(ICELL),TOTTHICK,BBOT,THCK,K,TTOP)
+	      Sn(ICELL)=THCK
+c            IF(IBOUNDKP.EQ.0) HOLD(ICELL)=BOT(ICELL)
+            ELSE
+CC              Sn(ICELL) = 1.0
+            ENDIF
+          ELSEIF(IAVHEAD.EQ.1)THEN
+C6E2--------HEAD IS SET TO AVERAGE OF CONNECTING ACTIVE CELLS
+            HEAD = 0.0
+            ISUM = 0
+            DO I=IA(ICELL)+1,IA(ICELL+1)-1
+              JJ=JA(I)
+              IF(IBOUND(JJ).NE.0) THEN
+                HEAD = HEAD + HNEW(JJ)
+                ISUM = ISUM + 1
+              ENDIF
+            ENDDO
+            HEAD = HEAD / ISUM
+            HNEW(ICELL) = HEAD
+            IF(ICELL.LE.NODES)THEN
+              BBOT=BOT(ICELL)
+              TTOP=TOP(ICELL)
+              TOTTHICK = TTOP - BBOT
+              DO K=1,NLAY
+                NNDLAY = NODLAY(K)
+                NSTRT = NODLAY(K-1)+1
+                IF(ICELL.GE.NSTRT.AND.ICELL.LE.NNDLAY)THEN
+                  KK = K
+                  GO TO 104
+                ENDIF
+              ENDDO
+104           CONTINUE
+              CALL SAT_THIK(ICELL,HNEW(ICELL),TOTTHICK,BBOT,THCK,K,TTOP)
+	        Sn(ICELL)=THCK
+c            IF(IBOUNDKP.EQ.0) HOLD(ICELL)=BOT(ICELL)
+            ELSE
+CC              Sn(ICELL) = 1.0
+            ENDIF
+          ELSE
+C6E3--------CHECK TO SEE IF NODE WAS PREVIOUSLY INACTIVE
+            IF(IBOUNDKP.EQ.0)THEN
+              WRITE(IOUT,12)ICELL
+12            FORMAT(1X,'*** NEED TO SET HEAD IF INACTIVE CELL IS MADE'
+     1        1X,'PRESCRIBED HEAD FOR CELL ',I9,', STOPPING ***')
+              STOP
+            ENDIF
+          ENDIF
+        ENDDO
+      ENDIF
+C------------------------------------------------------------------------
+C7 -----RETURN IF NO TRANSPORT SIMULATION
+      IF(INBCT.EQ.0) THEN
+C-------IF SOLVEACTIVE=2 SET IA2, JA2 HERE FOR TIB PACKAGE
+        IF(ISOLVEACTIVE.EQ.2) CALL SMS_REDUCE()
+C
+        RETURN
+      ENDIF
+C------------------------------------------------------------------------
+C8------CHECK IF ICBUND IS TO BE ZEROED OUT.
+      IF(NICB0.LE.0) THEN
+C
+C8A-----NICB0=<0, SO NO CELLS INACTIVATED.
+        WRITE(IOUT,6)
+    6   FORMAT(1X,/1X,'NO TRANSPORT CELLS INACTIVATED FROM LAST STRESS',
+     1         ' PERIOD')
+      ELSE
+C
+C8B-----NICB0>0, SO READ LIST OF INACTIVATED CELLS AND SET ICBUND TO ZERO
+        ALLOCATE (ITEMP(NICB0))
+        CALL U1DINT(ITEMP,ANAME,NICB0,0,IN,IOUT)
+        DO I=1,NICB0
+          ICELL = ITEMP(I)
+          ICBUND(ICELL) = 0
+          CONC(ICELL,:) = CINACT
+        ENDDO
+        DEALLOCATE(ITEMP)
+      ENDIF
+C------------------------------------------------------------------------
+C9------CHECK IF ICBUND IS TO BE ACTIVATED.
+      IF(NICB1.LE.0) THEN
+C
+C9A-----NICB1=<0, SO NO CELLS ACTIVATED.
+        WRITE(IOUT,7)
+7       FORMAT(1X,/1X,'NO TRANSPORT CELLS ACTIVATED FROM LAST STRESS',
+     1         ' PERIOD')
+      ELSE
+C
+C9B-----NICB1>0, SO READ LIST OF ACTIVATED CELLS AND SET ICBUND TO 1
+        IF(ALLOCATED(NODETIBC)) DEALLOCATE(NODETIBC)
+        IF(ALLOCATED(CTIB)) DEALLOCATE(CTIB)
+        ALLOCATE(NODETIBC(NICB1))
+        ALLOCATE(CTIB(NICB1,MCOMP))
+        DO IB=1,NICB1
+C9C-------READ CELL NUMBER
+          CALL URDCOM(In, Iout, line)
+          LLOC = 1
+          IF(IFREFM.EQ.0)THEN
+            READ(LINE,'(I10)') ICELL
+            LLOC = 11
+          ELSE
+            CALL URWORD(line, lloc, istart, istop, 2, ICELL, r,Iout, In)
+          END IF
+          NODETIBC(IB)=ICELL
+C9D--------GET OPTIONS
+          IAVCONC=0
+          ICONC = 0
+          CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,I,R,IOUT,IN)
+          IF(LINE(ISTART:ISTOP).EQ.'CONC') THEN
+C9D1---------READ KEYWORD OPTION FOR CONC TO BE READ.
+            ICONC = 1
+            DO ICOMP = 1,MCOMP
+              CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,CTMP,IOUT,IN)
+              CONCTMP(ICOMP)=CTMP
+            ENDDO
+          ELSEIF(LINE(ISTART:ISTOP).EQ.'AVCONC') THEN
+C9D2----------READ KEYWORD OPTION FOR AVERAGE CONC TO BE READ.
+            IAVCONC=1
+          ENDIF
+C9E-----------SET ICBUND AND CONC
+          ICBUNDKP = ICBUND(ICELL)
+          ICBUND(ICELL) = 1
+C9E1------CHECK FOR ERROR
+          IF(IBOUND(ICELL).EQ.0) THEN
+            WRITE(IOUT,55) ICELL
+55    FORMAT(5X,'*** TRANSPORT NODE ACTIVATED WHERE FLOW IS INACTIVE ',
+     *  'AT NODE: ',I10,' ***')
+            STOP
+          ENDIF
+C
+          IF(ICONC.EQ.1)THEN
+C9E2--------CONC IS SET TO GIVEN VALUES
+            DO ICOMP = 1,MCOMP
+              CONC(ICELL,ICOMP) = CONCTMP(ICOMP)
+              CTIB(IB,ICOMP)=CONC(ICELL,ICOMP)
+C              IF(ICBUNDKP.EQ.0) CONCO(ICELL,ICOMP)=0.
+            ENDDO
+          ELSEIF(IAVCONC.EQ.1)THEN
+C9E3--------CONC IS SET TO AVERAGE OF CONNECTING ACTIVE CELLS
+            CONCTMP = 0.0
+            ISUM = 0
+            DO I=IA(ICELL)+1,IA(ICELL+1)-1
+              JJ = JA(I)
+              IF(ICBUND(JJ).NE.0) THEN
+                DO ICOMP = 1,MCOMP
+                  CONCTMP(ICOMP) = CONCTMP(ICOMP) + CONC(JJ,ICOMP)
+                ENDDO
+                ISUM = ISUM + 1
+              ENDIF
+            ENDDO
+            DO ICOMP = 1,MCOMP
+              CONCTMP(ICOMP) = CONCTMP(ICOMP) / ISUM
+              CONC(ICELL,ICOMP) = CONCTMP(ICOMP)
+              CTIB(IB,ICOMP)=CONC(ICELL,ICOMP)
+C              IF(ICBUNDKP.EQ.0) CONCO(ICELL,ICOMP)=0.
+            ENDDO
+          ELSE
+C9E4--------CHECK TO SEE IF NODE WAS PREVIOUSLY INACTIVE
+            IF(ICBUNDKP.EQ.0)THEN
+              WRITE(IOUT,13)ICELL
+13            FORMAT(1X,'*** NEED TO SET CONC IF INACTIVE CELL IS MADE'
+     1        1X,'ACTIVE FOR CELL ',I9,', STOPPING ***')
+              STOP
+            ENDIF
+          ENDIF
+        ENDDO
+      ENDIF
+C------------------------------------------------------------------------
+C10-----CHECK IF ICBUND IS TO BE MADE MINUS ONE (PRESCRIBED CONC).
+      IF(NICBM1.LE.0) THEN
+C
+C10A----NICBM1=<0, SO NO CELLS MADE PRESCRIBED CONC.
+        WRITE(IOUT,8)
+8       FORMAT(/1X,'NO CELLS PRESCRIBED CONC FROM LAST STRESS PERIOD')
+      ELSE
+C
+C10B----NICBM1>0, SO READ LIST OF PRESCRIBED CONC CELLS AND SET ICBUND TO -1
+        DO IB=1,NICBM1
+C10C------READ CELL NUMBER
+          CALL URDCOM(In, Iout, line)
+          LLOC = 1
+          IF(IFREFM.EQ.0)THEN
+            READ(LINE,'(I10)') ICELL
+            LLOC = 11
+          ELSE
+            CALL URWORD(line, lloc, istart, istop, 2, ICELL, r,Iout, In)
+          END IF
+C10D-------GET OPTIONS
+          IAVCONC=0
+          ICONC = 0
+          CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,I,R,IOUT,IN)
+          IF(LINE(ISTART:ISTOP).EQ.'CONC') THEN
+C10D1--------READ KEYWORD OPTION FOR CONC TO BE READ.
+            ICONC = 1
+            DO ICOMP = 1,MCOMP
+              CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,CTMP,IOUT,IN)
+              CONCTMP(ICOMP)=CTMP
+            ENDDO
+          ELSEIF(LINE(ISTART:ISTOP).EQ.'AVCONC') THEN
+C10D2---------READ KEYWORD OPTION FOR AVERAGE CONC TO BE READ.
+             IAVCONC=1
+          ENDIF
+C10E----------SET ICBUND AND CONC
+          ICBUNDKP = ICBUND(ICELL)
+          ICBUND(ICELL) = -1
+C10E1-----CHECK FOR ERROR
+          IF(IBOUND(ICELL).EQ.0) THEN
+            WRITE(IOUT,56) ICELL
+56    FORMAT(5X,'*** TRANSPORT NODE SET TO PRESCRIBED CONC WHERE FLOW ',
+     *  'IS INACTIVE AT NODE: ',I10,' ***')
+            STOP
+          ENDIF
+C
+          IF(ICONC.EQ.1)THEN
+C10E2-------CONC IS SET TO GIVEN VALUES
+            DO ICOMP = 1,MCOMP
+              CONC(ICELL,ICOMP) = CONCTMP(ICOMP)
+C              IF(ICBUNDKP.EQ.0) CONCO(ICELL,ICOMP)=0.
+            ENDDO
+          ELSEIF(IAVCONC.EQ.1)THEN
+C10E3-------CONC IS SET TO AVERAGE OF CONNECTING ACTIVE CELLS
+            CONCTMP = 0.0
+            ISUM = 0
+            DO I=IA(ICELL)+1,IA(ICELL+1)-1
+              JJ=JA(I)
+              IF(ICBUND(JJ).NE.0) THEN
+                DO ICOMP = 1,MCOMP
+                  CONCTMP(ICOMP) = CONCTMP(ICOMP) + CONC(JJ,ICOMP)
+                ENDDO
+                ISUM = ISUM + 1
+              ENDIF
+            ENDDO
+            DO ICOMP = 1,MCOMP
+              CONCTMP(ICOMP) = CONCTMP(ICOMP) / ISUM
+              CONC(ICELL,ICOMP) = CONCTMP(ICOMP)
+C              IF(ICBUNDKP.EQ.0) CONCO(ICELL,ICOMP)=0.
+            ENDDO
+          ELSE
+C10E4-------CHECK TO SEE IF NODE WAS PREVIOUSLY INACTIVE
+            IF(ICBUNDKP.EQ.0)THEN
+              WRITE(IOUT,14)ICELL
+14            FORMAT(1X,'*** NEED TO SET CONC IF INACTIVE CELL IS MADE'
+     1        1X,'PRESCRIBED CONC FOR CELL ',I9,', STOPPING ***')
+              STOP
+            ENDIF
+          ENDIF
+        ENDDO
+        ENDIF
+C
+C-------IF SOLVEACTIVE=2 SET IA2, JA2 HERE FOR TIB PACKAGE
+        IF(ISOLVEACTIVE.EQ.2) CALL SMS_REDUCE()
+C
+C11-----RETURN
+      RETURN
+C
+      END
+C--------------------------------------------------------------------------
+      SUBROUTINE ATS1RP(KPER,INOC,IOUT)
+C     ******************************************************************
+C     READ PARAMETERS FOR ADAPTIVE TIME STEPPING.
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL, ONLY: NSTP,IFREFM,PERLEN,ISSFLG
+      USE GWFBASMODULE, ONLY: TIMOT,DELTAT,TMINAT,TMAXAT,TADJAT,
+     1    TCUTAT,NPTIMES,NPSTPS,IPEROC,IBOOT,IBOOTSCALE,DTBOOTSCALE
+C
+      REAL*8 TDEL
+      REAL DELTS,TMINS,TMAXS,TADJS,TCUTS
+      CHARACTER*400 LINE
+C     ------------------------------------------------------------------
+C
+C1------REFLECT ATS INPUT
+      WRITE(IOUT,91)
+   91 FORMAT(1X,/1X,'READING ADAPTIVE TIME STEPPING PARAMETERS')
+C
+C2------READ ADAPTIVE TIME-STEPPING PARAMETERS USING ORIGINAL NUMERIC STRUCTURE
+      CALL URDCOM(INOC,IOUT,LINE)
+      IF(IFREFM.EQ.0) THEN
+            READ(LINE,'(5F10.3,4I10)')DELTAT,TMINAT,TMAXAT,TADJAT,
+     1          TCUTAT,NPTIMES,NPSTPS,IBOOT,IBOOTSCALE
+      ELSE
+        LLOC = 1
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,DELTS,IOUT,INOC)
+        DELTAT = DELTS
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,TMINS,IOUT,INOC)
+        TMINAT = TMINS
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,TMAXS,IOUT,INOC)
+        TMAXAT = TMAXS
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,TADJS,IOUT,INOC)
+        TADJAT = TADJS
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,TCUTS,IOUT,INOC)
+        TCUTAT = TCUTS
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,NPTIMES,R,IOUT,INOC)
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,NPSTPS,R,IOUT,INOC)
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IBOOT,R,IOUT,INOC)
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IBOOTSCALE,R,IOUT,INOC)   
+      ENDIF
+100   CONTINUE
+C
+C3------PERFORM CHECKS ON INPUT
+      IF(DELTAT.LT.1.0E-20) DELTAT = 1.0
+      IF(TMINAT.LT.1.0E-20) TMINAT = 1.0E-10
+      IF(TMAXAT.LT.1.0E-20) TMAXAT = 1.0E10
+      IF(TADJAT.LT.1.0) TADJAT = 2.0
+      IF(TCUTAT.LT.1.0) TCUTAT = 5.0
+      IF(NPTIMES.GT.0)THEN
+        IF(KPER.EQ.1)THEN
+          IF(DELTAT.GT.TIMOT(1)) DELTAT = TIMOT(1)
+        ELSE
+          TDEL = TIMOT(KPER) - TIMOT(KPER-1)
+          IF(DELTAT.GT.TDEL) DELTAT = TDEL
+        ENDIF
+      ENDIF
+C      IF(NPSTPS.LE.0) NPSTPS=NSTP
+      IF(ISSFLG(KPER).EQ.1) DELTAT = PERLEN(KPER)
+C
+C4------WRITE ADAPTIVE TIME STEPPING PARAMETERS TO LST FILE
+      WRITE(IOUT,10) DELTAT,TMINAT,TMAXAT,TADJAT,TCUTAT,NPTIMES,NPSTPS,
+     1  IBOOT,IBOOTSCALE
+   10 FORMAT( / 5X,'INITIAL TIME STEP SIZE............(DELTAT) =',G16.8,
+     1        / 5X,'MINIMUM TIME STEP SIZE............(TMINAT) =',G16.8,
+     1        / 5X,'MAXIMUM TIME STEP SIZE............(TMAXAT) =',G16.8,
+     1        / 5X,'MULTIPLIER FOR DELT...............(TADJAT) =',G16.8,
+     1        / 5X,'DIVIDER FOR DELT..................(TCUTAT) =',G16.8,
+     1        / 5X,'NUMBER OF PRINTING TIMES.........(NPTIMES) =',I16,
+     1        / 5X,'NUMBER OF STEPS PER PRING.........(NPSTPS) =',I16, 
+     1        / 5X,'BOOTSTRAPPING INDEX................(IBOOT) =',I16,
+     1        / 5X,'BOOTSTRAP SCALING INDEX.......(IBOOTSCALE) =',I16)  
+C
+C5------RETURN.
+ 1000 RETURN
+      END
+C--------------------------------------------------------------------------
+      SUBROUTINE GWF2BAS7OT(KSTP,KPER,ICNVG,ISA,ISTRFIN)
+C     ******************************************************************
+C     OUTPUT TIME, VOLUMETRIC BUDGET, HEAD, AND DRAWDOWN
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL,    ONLY:ITMUNI,IOUT,IUNSTR,INCLN,DDREF,STRT,NEQS,HNEW,
+     1   IFMBC,MBEGWUNF,MBEGWUNT,MBECLNUNF,MBECLNUNT,STORFRAC,NPER
+      USE GWFBASMODULE,ONLY:DELT,PERTIM,TOTIM,IHDDFL,IBUDFL,
+     1                      MSUM,VBVL,VBNM,IDDREF
+      DOUBLE PRECISION TOTRIN,TOTROT,TOTSTORIN,TOTSTOROUT,STFRC
+C     ------------------------------------------------------------------
+C
+C
+C1------CLEAR PRINTOUT FLAG (IPFLG)
+      IPFLG=0
+C
+C
+      IF(ISA.EQ.0) THEN
+         WRITE(IOUT,9) KSTP,KPER
+    9    FORMAT(1X,/11X,'NO FLOW EQUATION TO SOLVE IN TIME STEP',I5,
+     1      ' OF STRESS PERIOD',I5,/1X,'ALL HEADS ARE 0.0')
+         IPFLG=1
+      END IF
+C
+C1A------IF ITERATIVE PROCEDURE FAILED TO CONVERGE PRINT MESSAGE
+      IF(ICNVG.EQ.0) THEN
+         WRITE(IOUT,17) KSTP,KPER
+   17    FORMAT(1X,/11X,'****FAILED TO CONVERGE IN TIME STEP',I5,
+     1      ' OF STRESS PERIOD ',I5,'****')
+         IPFLG=1
+      END IF
+C2-------FOR TRANSIENT-TO-SS CHECK IF STORAGE IS SMALLER THAN USER DEFINED VALUE
+      IF(STORFRAC(KPER).GT. -0.5) THEN 
+        TOTSTORIN = 0.0
+        TOTSTOROUT = 0.0
+        TOTRIN = 0.0
+        TOTROT = 0.0
+C2A--------LOOP OVER ALL BUDGET TERMS        
+        DO  L=1,MSUM - 1  
+C2B-------FIND AND ADD UP ALL STORAGE TERMS 
+          IF( VBNM(L). EQ. '         STORAGE'.
+     1    OR. VBNM(L).EQ. '     CLN STORAGE')THEN 
+            TOTSTORIN = TOTSTORIN + VBVL(3,L)
+            TOTSTOROUT = TOTSTOROUT + VBVL(4,L) 
+          ENDIF  
+C2C--------ADD UP ALL BUDGET TERMS IN TOTRIN AND TOTROT
+          TOTRIN=TOTRIN+VBVL(3,L)
+          TOTROT=TOTROT+VBVL(4,L)
+        ENDDO    
+        STFRC = (TOTSTORIN+TOTSTOROUT)/(TOTRIN+TOTROT)
+C2D-------SET FLAGS TO FINISH STRESS PERIOD AND WRITE RESULTS WHEN STEADY STATE IS REACHED        
+        IF(STFRC. LT. STORFRAC(KPER)) THEN
+          ISTRFIN = 2 ! STRESS PERIOD IS FINISHED
+c          IPFLG = 1
+c          IHDDFL = 1 ! PRINT/SAVE HEADS FOR STEADY-STATE
+c          WRITE(IOUT,18) KSTP,KPER,STFRC
+c   18     FORMAT(1X,/11X,'****TRANSIENT REACHED STEADY-STATE CONDITION',
+c     1     'AT TIME STEP',I5,' FOR STRESS PERIOD ',I5,'STORAGE FRACTION'
+c     2      ,1X,'REACHED ',E10.3,'****')          
+        ENDIF    
+      ENDIF      
+C
+C3------IF HEAD AND DRAWDOWN FLAG (IHDDFL) IS SET WRITE HEAD,
+C3------DRAWDOWN, AND IBOUND IN ACCORDANCE WITH FLAGS IN IOFLG.
+      IF(IHDDFL.EQ.0) GO TO 100
+C3A-----FOR POROUS MATRIX NODES
+      IF(IUNSTR.EQ.0)THEN ! WRITE M2K5 STYLE FOR STRUCTURED GRID
+        CALL SGWF2BAS7H(KSTP,KPER,IPFLG,ISA)
+        CALL SGWF2BAS7D(KSTP,KPER,IPFLG,ISA)
+        IF(IFMBC.NE.0) CALL SGWF2BAS7F(KSTP,KPER,IPFLG,ISA)
+        CALL SGWF2BAS7IB(KSTP,KPER)
+      ELSE
+        CALL SGWF2BAS7HU(KSTP,KPER,IPFLG,ISA)
+        CALL SGWF2BAS7DU(KSTP,KPER,IPFLG,ISA)
+        IF(IFMBC.NE.0) CALL SGWF2BAS7FU(KSTP,KPER,IPFLG,ISA)
+        CALL SGWF2BAS7IBU(KSTP,KPER)
+      ENDIF
+C-------------------------------------------------------------
+C3B-----FOR CONDUIT NODES
+C-------------------------------------------------------------
+      IF(INCLN.GT.0)THEN
+        CALL SCLN1H(KSTP,KPER,IPFLG,ISA)
+        CALL SCLN1D(KSTP,KPER,IPFLG,ISA)
+        IF(IFMBC.NE.0) CALL SCLN1F(KSTP,KPER,IPFLG,ISA)
+        CALL SCLN1IB(KSTP,KPER)
+      ENDIF
+C-------------------------------------------------------------
+C
+  100 CONTINUE
+
+C4------PRINT TOTAL BUDGET IF REQUESTED
+      IF(IBUDFL.EQ.0) GO TO 120
+      ITF = 0   ! FLOW EQUATION WAS SOLVED
+      CALL SGWF2BAS7V(MSUM,VBNM,VBVL,KSTP,KPER,IOUT,ITF)
+      IPFLG=1
+C
+  120 CONTINUE
+C5------RESET DRADWOWN REFERENCE ARRAY OF FLAG IS ON
+      IF(IDDREF.NE.0) THEN
+         IF(ASSOCIATED(DDREF,STRT)) THEN
+            ALLOCATE(DDREF(NEQS))
+         END IF
+         DDREF=HNEW
+         WRITE(IOUT,99)
+   99    FORMAT(1X,'Drawdown Reference has been reset to the',
+     1               ' end of this time step')
+         IDDREF=0
+      END IF
+C
+C6------END PRINTOUT WITH TIME SUMMARY AND FORM FEED IF ANY PRINTOUT
+C6------WILL BE PRODUCED.
+         IF(IPFLG.EQ.0) RETURN
+      CALL SGWF2BAS7T(KSTP,KPER,DELT,PERTIM,TOTIM,ITMUNI,IOUT)
+      WRITE(IOUT,101)
+  101 FORMAT('1')
+C
+C7------RETURN
+      RETURN
+      END
+C
+      SUBROUTINE SGWF2BAS7T(KSTP,KPER,DELT,PERTIM,TOTIM,ITMUNI,IOUT)
+C     ******************************************************************
+C     PRINT SIMULATION TIME
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      DOUBLE PRECISION DELT,PERTIM,TOTIM
+C     ------------------------------------------------------------------
+      WRITE(IOUT,199) KSTP,KPER
+  199 FORMAT(1X,///10X,'TIME SUMMARY AT END OF TIME STEP ',I9,
+     1     ' IN STRESS PERIOD ',I9)
+C
+C1------USE TIME UNIT INDICATOR TO GET FACTOR TO CONVERT TO SECONDS.
+      ZERO=0.
+      CNV=ZERO
+      IF(ITMUNI.EQ.1) CNV=1.
+      IF(ITMUNI.EQ.2) CNV=60.
+      IF(ITMUNI.EQ.3) CNV=3600.
+      IF(ITMUNI.EQ.4) CNV=86400.
+      IF(ITMUNI.EQ.5) CNV=31557600.
+C
+C2------IF FACTOR=0 THEN TIME UNITS ARE NON-STANDARD.
+      IF(CNV.NE.ZERO) GO TO 100
+C
+C2A-----PRINT TIMES IN NON-STANDARD TIME UNITS.
+      WRITE(IOUT,301) DELT,PERTIM,TOTIM
+  301 FORMAT(21X,'     TIME STEP LENGTH =',G15.6/
+     1       21X,'   STRESS PERIOD TIME =',G15.6/
+     2       21X,'TOTAL SIMULATION TIME =',G15.6)
+C
+C2B-----RETURN
+      RETURN
+C
+C3------CALCULATE LENGTH OF TIME STEP & ELAPSED TIMES IN SECONDS.
+  100 DELSEC=CNV*DELT
+      TOTSEC=CNV*TOTIM
+      PERSEC=CNV*PERTIM
+C
+C4------CALCULATE TIMES IN MINUTES,HOURS,DAYS AND YEARS.
+      SIXTY=60.
+      HRDAY=24.
+      DAYYR=365.25
+      DELMN=DELSEC/SIXTY
+      DELHR=DELMN/SIXTY
+      DELDY=DELHR/HRDAY
+      DELYR=DELDY/DAYYR
+      TOTMN=TOTSEC/SIXTY
+      TOTHR=TOTMN/SIXTY
+      TOTDY=TOTHR/HRDAY
+      TOTYR=TOTDY/DAYYR
+      PERMN=PERSEC/SIXTY
+      PERHR=PERMN/SIXTY
+      PERDY=PERHR/HRDAY
+      PERYR=PERDY/DAYYR
+C
+C5------PRINT TIME STEP LENGTH AND ELAPSED TIMES IN ALL TIME UNITS.
+      WRITE(IOUT,200)
+  200 FORMAT(19X,' SECONDS     MINUTES      HOURS',7X,
+     1    'DAYS        YEARS'/20X,59('-'))
+      WRITE (IOUT,201) DELSEC,DELMN,DELHR,DELDY,DELYR
+  201 FORMAT(1X,'  TIME STEP LENGTH',1P,5G12.5)
+      WRITE(IOUT,202) PERSEC,PERMN,PERHR,PERDY,PERYR
+  202 FORMAT(1X,'STRESS PERIOD TIME',1P,5G12.5)
+      WRITE(IOUT,203) TOTSEC,TOTMN,TOTHR,TOTDY,TOTYR
+  203 FORMAT(1X,'        TOTAL TIME',1P,5G12.5)
+C
+C6------RETURN
+      RETURN
+      END
+      SUBROUTINE SGWF2BAS7V(MSUM,VBNM,VBVL,KSTP,KPER,IOUT,ITF)
+C     ******************************************************************
+C     PRINT VOLUMETRIC BUDGET
+C     ******************************************************************
+C
+C     SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      CHARACTER*16 VBNM(MSUM)
+      DOUBLE PRECISION VBVL(4,MSUM)
+      CHARACTER*17 VAL1,VAL2
+      DOUBLE PRECISION ZERO,TWO,HUND,BIGVL1,BIGVL2,SMALL,
+     *  TOTRIN,TOTROT,TOTVIN,TOTVOT
+C     ------------------------------------------------------------------
+C
+C1------DETERMINE NUMBER OF INDIVIDUAL BUDGET ENTRIES.
+      MSUM1=MSUM-1
+      IF(MSUM1.LE.0) RETURN
+C
+C2------CLEAR RATE AND VOLUME ACCUMULATORS.
+      ZERO=0.
+      TWO=2.
+      HUND=100.
+      BIGVL1=9.99999E11
+      BIGVL2=9.99999E10
+      SMALL=0.1
+      TOTRIN=ZERO
+      TOTROT=ZERO
+      TOTVIN=ZERO
+      TOTVOT=ZERO
+C
+C3------ADD RATES AND VOLUMES (IN AND OUT) TO ACCUMULATORS.
+      DO 100 L=1,MSUM1
+      TOTRIN=TOTRIN+VBVL(3,L)
+      TOTROT=TOTROT+VBVL(4,L)
+      TOTVIN=TOTVIN+VBVL(1,L)
+      TOTVOT=TOTVOT+VBVL(2,L)
+  100 CONTINUE
+C
+C4------PRINT TIME STEP NUMBER AND STRESS PERIOD NUMBER.
+      IF(ITF.EQ.0) THEN
+        WRITE(IOUT,260) KSTP,KPER
+        WRITE(IOUT,265)
+      ELSE
+        WRITE(IOUT,261) KSTP,KPER
+        WRITE(IOUT,266)
+      ENDIF
+C
+C5------PRINT INDIVIDUAL INFLOW RATES AND VOLUMES AND THEIR TOTALS.
+      DO 200 L=1,MSUM1
+      IF(VBVL(1,L).NE.ZERO .AND.
+     1       (VBVL(1,L).GE.BIGVL1 .OR. VBVL(1,L).LT.SMALL)) THEN
+         WRITE(VAL1,'(1PE17.4)') VBVL(1,L)
+      ELSE
+         WRITE(VAL1,'(F17.4)') VBVL(1,L)
+      END IF
+      IF(VBVL(3,L).NE.ZERO .AND.
+     1       (VBVL(3,L).GE.BIGVL1 .OR. VBVL(3,L).LT.SMALL)) THEN
+         WRITE(VAL2,'(1PE17.4)') VBVL(3,L)
+      ELSE
+         WRITE(VAL2,'(F17.4)') VBVL(3,L)
+      END IF
+      WRITE(IOUT,275) VBNM(L),VAL1,VBNM(L),VAL2
+  200 CONTINUE
+      IF(TOTVIN.NE.ZERO .AND.
+     1      (TOTVIN.GE.BIGVL1 .OR. TOTVIN.LT.SMALL)) THEN
+         WRITE(VAL1,'(1PE17.4)') TOTVIN
+      ELSE
+         WRITE(VAL1,'(F17.4)') TOTVIN
+      END IF
+      IF(TOTRIN.NE.ZERO .AND.
+     1      (TOTRIN.GE.BIGVL1 .OR. TOTRIN.LT.SMALL)) THEN
+         WRITE(VAL2,'(1PE17.4)') TOTRIN
+      ELSE
+         WRITE(VAL2,'(F17.4)') TOTRIN
+      END IF
+      WRITE(IOUT,286) VAL1,VAL2
+C
+C6------PRINT INDIVIDUAL OUTFLOW RATES AND VOLUMES AND THEIR TOTALS.
+      WRITE(IOUT,287)
+      DO 250 L=1,MSUM1
+      IF(VBVL(2,L).NE.ZERO .AND.
+     1       (VBVL(2,L).GE.BIGVL1 .OR. VBVL(2,L).LT.SMALL)) THEN
+         WRITE(VAL1,'(1PE17.4)') VBVL(2,L)
+      ELSE
+         WRITE(VAL1,'(F17.4)') VBVL(2,L)
+      END IF
+      IF(VBVL(4,L).NE.ZERO .AND.
+     1       (VBVL(4,L).GE.BIGVL1 .OR. VBVL(4,L).LT.SMALL)) THEN
+         WRITE(VAL2,'(1PE17.4)') VBVL(4,L)
+      ELSE
+         WRITE(VAL2,'(F17.4)') VBVL(4,L)
+      END IF
+      WRITE(IOUT,275) VBNM(L),VAL1,VBNM(L),VAL2
+  250 CONTINUE
+      IF(TOTVOT.NE.ZERO .AND.
+     1      (TOTVOT.GE.BIGVL1 .OR. TOTVOT.LT.SMALL)) THEN
+         WRITE(VAL1,'(1PE17.4)') TOTVOT
+      ELSE
+         WRITE(VAL1,'(F17.4)') TOTVOT
+      END IF
+      IF(TOTROT.NE.ZERO .AND.
+     1      (TOTROT.GE.BIGVL1 .OR. TOTROT.LT.SMALL)) THEN
+         WRITE(VAL2,'(1PE17.4)') TOTROT
+      ELSE
+         WRITE(VAL2,'(F17.4)') TOTROT
+      END IF
+      WRITE(IOUT,298) VAL1,VAL2
+C
+C7------CALCULATE THE DIFFERENCE BETWEEN INFLOW AND OUTFLOW.
+C
+C7A-----CALCULATE DIFFERENCE BETWEEN RATE IN AND RATE OUT.
+      DIFFR=TOTRIN-TOTROT
+      ADIFFR=ABS(DIFFR)
+C
+C7B-----CALCULATE PERCENT DIFFERENCE BETWEEN RATE IN AND RATE OUT.
+      PDIFFR=ZERO
+      AVGRAT=(TOTRIN+TOTROT)/TWO
+      IF(AVGRAT.NE.ZERO) PDIFFR=HUND*DIFFR/AVGRAT
+C
+C7C-----CALCULATE DIFFERENCE BETWEEN VOLUME IN AND VOLUME OUT.
+      DIFFV=TOTVIN-TOTVOT
+      ADIFFV=ABS(DIFFV)
+C
+C7D-----GET PERCENT DIFFERENCE BETWEEN VOLUME IN AND VOLUME OUT.
+      PDIFFV=ZERO
+      AVGVOL=(TOTVIN+TOTVOT)/TWO
+      IF(AVGVOL.NE.ZERO) PDIFFV=HUND*DIFFV/AVGVOL
+C
+C8------PRINT DIFFERENCES AND PERCENT DIFFERENCES BETWEEN INPUT
+C8------AND OUTPUT RATES AND VOLUMES.
+      IF(ADIFFV.NE.ZERO .AND.
+     1      (ADIFFV.GE.BIGVL2 .OR. ADIFFV.LT.SMALL)) THEN
+         WRITE(VAL1,'(1PE17.4)') DIFFV
+      ELSE
+         WRITE(VAL1,'(F17.4)') DIFFV
+      END IF
+      IF(ADIFFR.NE.ZERO .AND.
+     1      (ADIFFR.GE.BIGVL2 .OR. ADIFFR.LT.SMALL)) THEN
+         WRITE(VAL2,'(1PE17.4)') DIFFR
+      ELSE
+         WRITE(VAL2,'(F17.4)') DIFFR
+      END IF
+      WRITE(IOUT,299) VAL1,VAL2
+      WRITE(IOUT,300) PDIFFV,PDIFFR
+C
+C9------RETURN.
+      RETURN
+C
+C    ---FORMATS
+C
+  260 FORMAT('1',/2X,'VOLUMETRIC BUDGET FOR ENTIRE MODEL AT END OF'
+     1,' TIME STEP',I8,' IN STRESS PERIOD',I8/2X,87('-'))
+  261 FORMAT('1',/2X,'MASS BUDGET FOR ENTIRE MODEL AT END OF'
+     1,' TIME STEP',I8,' IN STRESS PERIOD',I8/2X,87('-'))     
+  265 FORMAT(1X,/5X,'CUMULATIVE VOLUMES',6X,'L**3',7X
+     1,'RATES FOR THIS TIME STEP',6X,'L**3/T'/5X,18('-'),17X,24('-')
+     2//11X,'IN:',38X,'IN:'/11X,'---',38X,'---')
+  266 FORMAT(1X,/5X,'CUMULATIVE MASS   ',6X,'M/L^3 * L^3',7X
+     1,'RATES FOR THIS TIME STEP',6X,'M/L^3 * L^3/T'/5X,18('-'),
+     217X,24('-')//11X,'IN:',38X,'IN:'/11X,'---',38X,'---')      
+  275 FORMAT(1X,3X,A16,' =',A17,6X,A16,' =',A17)
+  286 FORMAT(1X,/12X,'TOTAL IN =',A,14X,'TOTAL IN =',A)
+  287 FORMAT(1X,/10X,'OUT:',37X,'OUT:'/10X,4('-'),37X,4('-'))
+  298 FORMAT(1X,/11X,'TOTAL OUT =',A,13X,'TOTAL OUT =',A)
+  299 FORMAT(1X,/12X,'IN - OUT =',A,14X,'IN - OUT =',A)
+  300 FORMAT(1X,/1X,'PERCENT DISCREPANCY =',F15.2
+     1,5X,'PERCENT DISCREPANCY =',F15.2,///)
+C
+      END
+      SUBROUTINE SGWF2BAS7N(KPER,KSTP,INOC,IOUT,NLAY)
+C     ******************************************************************
+C     SET OUTPUT FLAGS USING ALPHABETIC OUTPUT CONTROL INPUT STRUCTURE
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GWFBASMODULE, ONLY: IOFLG,IHDDFL,ISPCFL,IBUDFL,ICBCFL,IPEROC,
+     1    ITSOC,IBDOPT,IATS,DELTAT,TMINAT,TMAXAT,TADJAT,TCUTAT,
+     2    IDDREF,IDDREFNEW,IBOOT,IBOOTSCALE
+      USE SMSMODULE, ONLY: HCLOSE,BTOL,MXITER
+      SAVE MXITERKP
+C
+      CHARACTER*400 LINE
+C     ------------------------------------------------------------------
+C
+C1------ERROR IF OUTPUT CONTROL TIME STEP PRECEDES CURRENT SIMULATION
+C1------TIME STEP.
+      IF((IPEROC.LT.KPER).OR.(IPEROC.EQ.KPER .AND. ITSOC.LT.KSTP)) THEN
+         WRITE(IOUT,5) IPEROC,ITSOC,KPER,KSTP
+    5    FORMAT(1X,/1X,'OUTPUT CONTROL WAS SPECIFIED FOR A NONEXISTENT',
+     1   ' TIME STEP',/
+     2   1X,'OR OUTPUT CONTROL DATA ARE NOT ENTERED IN ASCENDING ORDER',
+     3   /1X,'OUTPUT CONTROL STRESS PERIOD ',I8,'   TIME STEP ',I8,/
+     4   1X,'MODEL STRESS PERIOD ',I8,'   TIME STEP ',I8,/
+     5   1X,'APPLYING THE SPECIFIED OUTPUT CONTROL TO THE CURRENT TIME',
+     6   ' STEP')
+         IPEROC=KPER
+         ITSOC=KSTP
+      END IF
+C
+C2------CLEAR I/O FLAGS.
+      IHDDFL=0
+      ISPCFL=0
+      IBUDFL=0
+      ICBCFL=0
+      DO 10 I=1,7
+      DO 10 K=1,NLAY
+      IOFLG(K,I)=0
+10    CONTINUE
+      IF(KPER.EQ.1.AND.KSTP.EQ.1) MXITERKP = MXITER
+C
+C3------IF OUTPUT CONTROL TIME STEP DOES NOT MATCH SIMULATION TIME STEP,
+C3------WRITE MESSAGE THAT THERE IS NO OUTPUT CONTROL THIS TIME STEP,
+C3------AND RETURN.
+      IF(IATS.EQ.0)THEN
+        IF(IPEROC.NE.KPER .OR. ITSOC.NE.KSTP) THEN
+          WRITE(IOUT,11) KPER,KSTP
+11        FORMAT(1X,/1X,'NO OUTPUT CONTROL FOR STRESS PERIOD ',I8,
+     1              '   TIME STEP ',I8)
+          RETURN
+        END IF
+      ELSE
+        IF(IPEROC.NE.KPER) THEN
+          WRITE(IOUT,12) KPER
+12        FORMAT(1X,/1X,'NO OUTPUT CONTROL FOR STRESS PERIOD ',I8)
+          RETURN
+        END IF
+      ENDIF
+C
+C4------OUTPUT CONTROL TIME STEP MATCHES SIMULATION TIME STEP.
+      IF(IATS.EQ.0)THEN
+        WRITE(IOUT,13) IPEROC,ITSOC
+13      FORMAT(1X,/1X,'OUTPUT CONTROL FOR STRESS PERIOD ',I8,
+     1              '   TIME STEP ',I8)
+      ELSE
+        WRITE(IOUT,14) IPEROC
+14      FORMAT(1X,/1X,'OUTPUT CONTROL FOR STRESS PERIOD ',I8)
+      ENDIF
+C4B-----SET IDDREF FLAG FROM NEW SETTING
+      IDDREF=IDDREFNEW
+      IF(IDDREFNEW.NE.0) WRITE(IOUT,52)
+   52      FORMAT(1X,'Drawdown Reference will be reset at the',
+     1               ' end of this time step')
+C
+C
+C4A-----OUTPUT CONTROL MATCHES SIMULATION TIME.  READ NEXT OUTPUT
+C4A-----RECORD; SKIP ANY BLANK LINES.
+50    READ(INOC,'(A)',END=1000) LINE
+      IF(LINE.EQ.' ') GO TO 50
+C
+C4A1----LOOK FOR "PERIOD", WHICH TERMINATES OUTPUT CONTROL FOR CURRENT
+C4A1----TIME STEP.  IF FOUND, DECODE TIME STEP FOR NEXT OUTPUT.
+      LLOC=1
+      CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+      IF(LINE(ISTART:ISTOP).EQ.'PERIOD') THEN
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IPEROC,R,IOUT,INOC)
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+         IF(IATS.EQ.1) GO TO 521 ! DO NOT CHECK FOR STEP FOR ADAPTIVE TIME STEPPING
+c         CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+         IF(LINE(ISTART:ISTOP).NE.'STEP') GO TO 2000
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,ITSOC,R,IOUT,INOC)
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+521      CONTINUE
+C4A1a------SET DDREF FLAG IF KEYWORD IS SET
+         IF(LINE(ISTART:ISTOP).EQ.'DDREFERENCE') THEN
+           IDDREFNEW=1
+         ELSE
+           IDDREFNEW=0
+         END IF
+         RETURN
+C
+C4A2----LOOK FOR "PRINT", WHICH MAY REFER TO "BUDGET", "HEAD", OR
+C4A2----"DRAWDOWN" OR CONCENTRATION.
+      ELSE IF(LINE(ISTART:ISTOP).EQ.'PRINT') THEN
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+         IF(LINE(ISTART:ISTOP).EQ.'BUDGET') THEN
+            WRITE(IOUT,53)
+53          FORMAT(4X,'PRINT BUDGET')
+            IBUDFL=1
+         ELSE IF(LINE(ISTART:ISTOP).EQ.'HEAD') THEN
+            CALL SGWF2BAS7L(1,LINE,LLOC,IOFLG,NLAY,IOUT,'PRINT HEAD',
+     1              INOC)
+            IHDDFL=1
+         ELSE IF(LINE(ISTART:ISTOP).EQ.'DRAWDOWN') THEN
+            CALL SGWF2BAS7L(2,LINE,LLOC,IOFLG,NLAY,IOUT,
+     1              'PRINT DRAWDOWN',INOC)
+            IHDDFL=1
+         ELSE IF(LINE(ISTART:ISTOP).EQ.'CONC') THEN
+            CALL SGWF2BAS7L(5,LINE,LLOC,IOFLG,NLAY,IOUT,'PRINT CONC',
+     1              INOC)
+            ISPCFL=1
+         ELSE IF(LINE(ISTART:ISTOP).EQ.'CONCENTRATION') THEN
+            CALL SGWF2BAS7L(5,LINE,LLOC,IOFLG,NLAY,IOUT,'PRINT CONC',
+     1              INOC)
+            ISPCFL=1
+         ELSE
+            GO TO 2000
+         END IF
+C-----------------------------------------------------------------------------
+C4A3----LOOK FOR "SAVE", WHICH MAY REFER TO "BUDGET", "HEAD",
+C4A3----"DRAWDOWN", OR "IBOUND" OR CONCENTRATION.
+      ELSE IF(LINE(ISTART:ISTOP).EQ.'SAVE') THEN
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,N,R,IOUT,INOC)
+         IF(LINE(ISTART:ISTOP).EQ.'BUDGET') THEN
+            WRITE(IOUT,57)
+57          FORMAT(4X,'SAVE BUDGET')
+            ICBCFL=IBDOPT
+         ELSE IF(LINE(ISTART:ISTOP).EQ.'HEAD') THEN
+            CALL SGWF2BAS7L(3,LINE,LLOC,IOFLG,NLAY,IOUT,'SAVE HEAD',
+     &                      INOC)
+            IHDDFL=1
+         ELSE IF(LINE(ISTART:ISTOP).EQ.'DRAWDOWN') THEN
+            CALL SGWF2BAS7L(4,LINE,LLOC,IOFLG,NLAY,IOUT,'SAVE DRAWDOWN',
+     1          INOC)
+            IHDDFL=1
+c          ELSE IF(LINE(ISTART:ISTOP).EQ.'IBOUND') THEN
+c            CALL SGWF2BAS7L(5,LINE,LLOC,IOFLG,NLAY,IOUT,'SAVE IBOUND',
+c     1                     INOC)
+c            IHDDFL=1
+         ELSE IF(LINE(ISTART:ISTOP).EQ.'CONC') THEN
+            CALL SGWF2BAS7L(6,LINE,LLOC,IOFLG,NLAY,IOUT,'SAVE CONC',
+     &                      INOC)
+            ISPCFL=1
+         ELSE IF(LINE(ISTART:ISTOP).EQ.'CONCENTRATION') THEN
+            CALL SGWF2BAS7L(6,LINE,LLOC,IOFLG,NLAY,IOUT,'SAVE CONC',
+     &                      INOC)
+            ISPCFL=1
+         ELSE
+            GO TO 2000
+         END IF
+C--------------------------------------------------------------------------
+C4A4-----LOOK FOR ATS PARAMETERS
+       ELSEIF(LINE(ISTART:ISTOP).EQ.'DELTAT') THEN
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,DELTS,IOUT,INOC)
+         DELTAT = DELTS
+         WRITE(IOUT,61)DELTAT
+61          FORMAT(4X,'DELTAT',G15.6)
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'TMINAT') THEN
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,TMINS,IOUT,INOC)
+         TMINAT = TMINS
+         WRITE(IOUT,62)TMINAT
+62          FORMAT(4X,'TMINAT',G15.6)
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'TMAXAT') THEN
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,TMAXS,IOUT,INOC)
+         TMAXAT = TMAXS
+         WRITE(IOUT,63)TMAXAT
+63          FORMAT(4X,'TMAXAT',G15.6)
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'TADJAT') THEN
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,TADJS,IOUT,INOC)
+         TADJAT = TADJS
+         WRITE(IOUT,64)TADJAT
+64          FORMAT(4X,'TADJAT',G15.6)
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'TCUTAT') THEN
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,TCUTS,IOUT,INOC)
+         TCUTAT = TCUTS
+         WRITE(IOUT,65)TCUTAT
+65          FORMAT(4X,'TCUTAT',G15.6)
+C4A5-----LOOK FOR SOLVER PARAMETERS
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'HCLOSE') THEN
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,HCLOSES,IOUT,INOC)
+         HCLOSE = HCLOSES
+         WRITE(IOUT,66)HCLOSE
+66          FORMAT(4X,'HCLOSE',G15.6)
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'BTOL') THEN
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,BTOLS,IOUT,INOC)
+         BTOL = BTOLS
+         WRITE(IOUT,67)BTOL
+67          FORMAT(4X,'BTOL',G15.6)
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'MXITER') THEN
+         CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,MXITER,R,IOUT,INOC)
+C4A5a------CHECK IF MXITER IS LARGER THAN THAT FROM SMS FILE, IF SO STOP
+csp         IF(MXITERKP.LT.MXITER) THEN
+csp            WRITE(IOUT,69) MXITER, MXITERKP
+csp69          FORMAT(4X,'MXITER = ',I5,' IS GREATER THAN VALUE IN SMS'
+csp     1       ,1X,'FILE OF',I5,' AND THUS EXCEEDS DIMENSIONS, STOPPING')
+csp            STOP
+csp         ENDIF
+         WRITE(IOUT,68)MXITER
+68       FORMAT(4X,'MXITER',G15.6)
+C4A6-----LOOK FOR BOOTSTRAPPING PARAMETERS         
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'BOOTSTRAP') THEN
+         IBOOT = 1
+         WRITE(IOUT,69)IBOOT
+69       FORMAT(4X,'IBOOT',I5)   
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'NOBOOTSTRAP') THEN
+         IBOOT = 0
+         WRITE(IOUT,69)IBOOT         
+       ELSEIF(LINE(ISTART:ISTOP).EQ.'BOOTSTRAPSCALE') THEN
+         IBOOTSCALE = 1
+         WRITE(IOUT,71)IBOOTSCALE
+71       FORMAT(4X,'IBOOTSCALE',I5)   
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'NOBOOTSTRAPSCALE') THEN
+         IBOOTSCALE = 0
+         WRITE(IOUT,71)IBOOTSCALE         
+C
+C4A6----WHEN NO KNOWN ALPHABETIC WORDS ARE FOUND, THERE IS AN ERROR.
+      ELSE
+         GO TO 2000
+C
+C4B-----AFTER SUCCESSFULLY DECODING ONE RECORD, READ ANOTHER.
+      END IF
+      GO TO 50
+C
+C5------END OF FILE WHILE READING AN OUTPUT CONTROL RECORD, SO THERE
+C5------WILL BE NO FURTHER OUTPUT.  SET IPEROC AND ITSOC HIGH ENOUGH
+C5------THAT THE MODEL TIME WILL NEVER MATCH THEM.
+1000  IPEROC=9999
+      ITSOC=9999
+      RETURN
+C
+C6------ERROR DECODING ALPHABETIC INPUT STRUCTURE.
+2000  WRITE(IOUT,2001) LINE
+2001  FORMAT(1X,/1X,'ERROR READING OUTPUT CONTROL INPUT DATA:'/1X,A80)
+      CALL USTOP(' ')
+      END
+      SUBROUTINE SGWF2BAS7L(IPOS,LINE,LLOC,IOFLG,NLAY,IOUT,LABEL,INOC)
+C     ******************************************************************
+C     WHEN USING ALPHABETIC OUTPUT CONTROL, DECODE LAYER
+C     NUMBERS FOR PRINTING OR SAVING HEAD OR DRAWDOWN
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      DIMENSION IOFLG(NLAY,7)
+      CHARACTER*400 LINE
+      CHARACTER*(*) LABEL
+      DIMENSION LAYER(999)
+C     ------------------------------------------------------------------
+C
+C1------INITIALIZE COUNTER FOR NUMBER OF LAYERS FOR WHICH OUTPUT IS
+C1------SPECIFIED.
+      NSET=0
+C
+C2------CHECK FOR A VALID LAYER NUMBER.  WHEN FOUND, SET FLAG AND
+C2------REPEAT.
+10    CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,L,R,-1,INOC)
+      IF(L.GT.0 .AND. L.LE.NLAY) THEN
+         NSET=NSET+1
+         LAYER(NSET)=L
+         IOFLG(L,IPOS)=1
+         GO TO 10
+      END IF
+C
+C3------DONE CHECKING FOR LAYER NUMBERS.  IF NO LAYER NUMBERS WERE
+C3------FOUND, SET FLAGS FOR ALL LAYERS.
+      IF(NSET.EQ.0) THEN
+         DO 110 K=1,NLAY
+         IOFLG(K,IPOS)=1
+110      CONTINUE
+         WRITE(IOUT,111) LABEL
+111      FORMAT(4X,A,' FOR ALL LAYERS')
+C
+C4------IF ONE OR MORE LAYER NUMBERS WERE FOUND, PRINT THE NUMBERS.
+      ELSE
+         WRITE(IOUT,112) LABEL,(LAYER(M),M=1,NSET)
+112      FORMAT(4X,A,' FOR LAYERS:',(1X,15I3))
+      END IF
+C
+C5------RETURN.
+      RETURN
+      END
+C
+C -----------------------------------------------------------------------
+      SUBROUTINE GWF2BAS7U1DA
+C  DEALLOCATE GLOBAL DATA
+      USE GLOBAL
+      USE PARAMMODULE
+      USE GWFBASMODULE 
+      INTEGER ALLOC_ERR
+C
+        DEALLOCATE(NCOL)
+        DEALLOCATE(NROW)
+        DEALLOCATE(NLAY)
+        DEALLOCATE(NPER)
+        DEALLOCATE(NBOTM)
+        DEALLOCATE(NCNFBD)
+        DEALLOCATE(ITMUNI)
+        DEALLOCATE(LENUNI)
+        DEALLOCATE(IXSEC)
+        DEALLOCATE(ITRSS)
+        DEALLOCATE(INBAS)
+        DEALLOCATE(IFREFM)
+        DEALLOCATE(NODES)
+        DEALLOCATE(NEQS)
+        DEALLOCATE(IOUT)
+C
+        DEALLOCATE(IUNIT)
+        DEALLOCATE(LAYCBD)
+        DEALLOCATE(LAYHDT)
+        DEALLOCATE(LAYHDS)
+        DEALLOCATE(ICONCV,NOCVCO,NOVFC)
+        IF(ALLOCATED(NOCVCO)) DEALLOCATE(NOCVCO)
+        DEALLOCATE(NSTP)
+        DEALLOCATE(TSMULT)
+        DEALLOCATE(ISSFLG)
+        DEALLOCATE(HNEW)
+        DEALLOCATE(HOLD)
+        DEALLOCATE(SN,SO)
+        DEALLOCATE(IBOUND)
+        IF(IUNSTR.EQ.0)THEN
+          DEALLOCATE(DELR)
+          DEALLOCATE(DELC)
+        ENDIF
+C
+        DEALLOCATE(BOT)
+        DEALLOCATE(TOP)
+        DEALLOCATE(AREA)
+        DEALLOCATE(PGF)
+        DEALLOCATE(FAHL)
+        DEALLOCATE(IVC)
+        DEALLOCATE(NODLAY)
+        DEALLOCATE(RHS)
+        DEALLOCATE(AMAT)
+        DEALLOCATE(IA)
+        DEALLOCATE(JA)
+        DEALLOCATE(NJAS, JAS)
+        IF(INCLN.NE.0.OR.INGNC.NE.0.OR.INGNC2.NE.0.OR.INGNCn.NE.0) THEN
+          DEALLOCATE(JAFL)
+        ENDIF
+        DEALLOCATE(INGNC,INGNC2,INGNCn,ISYMFLG)
+C-------------------------------------------------------
+C---------DEALLOCATE CLN DOMAIN ARRAYS
+C-------------------------------------------------------
+        IF(INCLN.GT.0) CALL CLN1DA
+        DEALLOCATE(INCLN)
+C-------------------------------------------------------
+        DEALLOCATE(ISYM)
+        DEALLOCATE(BUFF)
+        IF(.NOT.ASSOCIATED(DDREF,STRT))
+     1           DEALLOCATE(DDREF)
+        DEALLOCATE(STRT)
+        DEALLOCATE(IDDREF,IDDREFNEW)
+C
+        DEALLOCATE(ICLSUM,IPSUM,INAMLOC,NMLTAR,NZONAR,NPVAL)
+        DEALLOCATE (B)
+        DEALLOCATE (IACTIVE)
+        DEALLOCATE (IPLOC)
+        DEALLOCATE (IPCLST)
+        DEALLOCATE (PARNAM)
+        DEALLOCATE (PARTYP)
+        DEALLOCATE (ZONNAM)
+        DEALLOCATE (MLTNAM)
+        DEALLOCATE (INAME)
+        DEALLOCATE (RMLT)
+        DEALLOCATE (IZON)
+C
+        DEALLOCATE(MSUM)
+        DEALLOCATE(IHEDFM)
+        DEALLOCATE(IHEDUN)
+        DEALLOCATE(IDDNFM)
+        DEALLOCATE(IDDNUN)
+        DEALLOCATE(IBOUUN)
+        DEALLOCATE(LBHDSV)
+        DEALLOCATE(LBDDSV)
+        DEALLOCATE(LBBOSV)
+        DEALLOCATE(IBUDFL)
+        DEALLOCATE(ICBCFL)
+        DEALLOCATE(IHDDFL)
+        DEALLOCATE(ISPCFL)
+        DEALLOCATE(IAUXSV)
+        DEALLOCATE(IBDOPT)
+        DEALLOCATE(IPRTIM)
+        DEALLOCATE(IFRCNVG)
+        DEALLOCATE(IPEROC)
+        DEALLOCATE(ITSOC)
+        DEALLOCATE(ICHFLG)
+        DEALLOCATE(DELT)
+        DEALLOCATE(PERTIM)
+        DEALLOCATE(PERLEN)
+        DEALLOCATE(TOTIM)
+        DEALLOCATE(HNOFLO)
+        DEALLOCATE(CHEDFM)
+        DEALLOCATE(CDDNFM)
+        DEALLOCATE(CBOUFM)
+        IF(NPTIMES.GT.0) DEALLOCATE(TIMOT,TIMOTC,ITIMOT,ITIMOTC)
+        IF(IUGBOOT.NE.0) THEN
+          DEALLOCATE (BOOTSCALE,BOOTSLOPE,HREADBOOT,STAT=ALLOC_ERR)
+        ENDIF  
+        DEALLOCATE(IUGBOOT,IUCBOOT,IUDBOOT,IBOOT,IBOOTSCALE,
+     *   STAT=ALLOC_ERR)     
+        DEALLOCATE(IATS,NPTIMES,NPSTPS,IBUDFLAT,ICBCFLAT,IHDDFLAT)
+        DEALLOCATE(DELTAT,TMINAT,TMAXAT,TADJAT,TCUTAT)
+        DEALLOCATE(IFAST,ISPFAST,ITSFAST,IUGFAST,IUCFAST,IFASTH)
+        DEALLOCATE(IFASTC,ISPFASTC,ITSFASTC,IUGFASTC,IUCFASTC,IUMFASTC,
+     1   IUDFAST,IUDFASTC)
+C
+        DEALLOCATE(IOFLG)
+        DEALLOCATE(VBVL)
+        DEALLOCATE(VBNM)
+        DEALLOCATE(IUNSTR)
+C
+        DEALLOCATE(IDEALLOC_LPF)
+        DEALLOCATE(IDEALLOC_HY)
+        DEALLOCATE(ITRNSP)
+!        DEALLOCATE(NOCVCO)  !kkz - already deallocated previously in this subroutine per JCH
+!        DEALLOCATE(ICONCV)  !kkz - already deallocated previously in this subroutine per JCH
+C
+        NULLIFY(IATMP,NJA)
+        DEALLOCATE(CL1,CL2)
+C
+      RETURN
+      END
+
+
