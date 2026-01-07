@@ -36,6 +36,7 @@ if fc_id == 'gcc'
                    '-pedantic',
                    '-cpp',
                    '-ffixed-line-length-none',
+                   '-fdec',                      # Enable DEC extensions (SHARE, BUFFERED in OPEN statements)
                    '-Wcharacter-truncation',
                    '-Wno-unused-dummy-argument', # This makes problems with OOP
                    '-Wno-intrinsic-shadow',      # We shadow intrinsics with methods, which should be fine
