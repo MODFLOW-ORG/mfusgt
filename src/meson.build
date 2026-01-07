@@ -38,7 +38,6 @@ mfusgt_sources = files(
  'lak_gag_sfr_modules.f',
  'parutl7.f',
  'pcgu7.f',
- 'ReadCBC.f',
  'sparse.f',
  'tvmu1.f',
  'tvmu2.f',

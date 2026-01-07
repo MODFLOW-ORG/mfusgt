@@ -284,9 +284,9 @@ C     ******************************************************************
 C
 C        SPECIFICATIONS:
 C     ------------------------------------------------------------------
-      USE GLOBAL,      ONLY:IOUT,TOP,BOT,PGF,FAHL,IA,JA,JAS,ISYM,IVC
+      USE GLOBAL, ONLY:IOUT,TOP,BOT,PGF,FAHL,IA,JA,JAS,ISYM,IVC,IBOUND
       USE GWFBCFMODULE, ONLY: LAYCON
-      USE GWFHFBMODULE,ONLY:NHFB,HFB
+      USE GWFHFBMODULE, ONLY:NHFB,HFB
 C     ------------------------------------------------------------------
 C
 C1------INITIALIZE ERROR FLAG TO ZERO.
@@ -299,6 +299,7 @@ C
 C3------FIND ROW AND COLUMN NUMBERS OF THE TWO CELLS ON BOTH SIDES
 C3------OF THE BARRIER.
         N2 = HFB(2,II)
+        IF(IBOUND(N1).EQ.0.OR.IBOUND(N2).EQ.0) CYCLE
         K = HFB(3,II)
         IF (LAYCON(K).EQ.3.OR.LAYCON(K).EQ.1) CYCLE
 C
@@ -729,14 +730,16 @@ C
       SUBROUTINE GWF2HFB7U1DA
 C  Deallocate HFB data for a grid.
       USE GWFHFBMODULE
+      INTEGER ALLOC_ERR
 C
-        DEALLOCATE(MXHFB)
-        DEALLOCATE(NHFB)
-        DEALLOCATE(IPRHFB)
-        DEALLOCATE(NHFBNP)
-        DEALLOCATE(NPHFB)
-        DEALLOCATE(IHFBPB)
-        DEALLOCATE(HFB)
+        DEALLOCATE(MXHFB, STAT = ALLOC_ERR)
+        DEALLOCATE(NHFB, STAT = ALLOC_ERR)
+        DEALLOCATE(IPRHFB, STAT = ALLOC_ERR)
+        DEALLOCATE(NHFBNP, STAT = ALLOC_ERR)
+        DEALLOCATE(NPHFB, STAT = ALLOC_ERR)
+        DEALLOCATE(IHFBPB, STAT = ALLOC_ERR)
+        DEALLOCATE(ITRHFB, STAT = ALLOC_ERR)
+        DEALLOCATE(HFB, STAT = ALLOC_ERR)
 C
       RETURN
       END

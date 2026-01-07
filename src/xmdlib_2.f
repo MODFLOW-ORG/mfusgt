@@ -17,7 +17,26 @@
 !                    modifications in allocattion routines, redblack numbering check, and explicit deallocation of arrays
 !        version 2.1.4   November 8, 2012
 !                    eliminates xmdshell calls in xmdrowrg and xmdredblack
+!        version 2.1.5   Enhanced NaN and zero-change protection
+!                    added safe division function and enhanced convergence checking
 !
+
+!     Safe division function to prevent NaN values and division by zero
+      double precision function safe_divide(numerator, denominator, 
+     1 default_value)
+        implicit none
+        double precision, intent(in) :: numerator, denominator, 
+     1    default_value
+        double precision, parameter :: EPS_MIN = 1.0d-300
+        double precision :: abs_denom
+        
+        abs_denom = abs(denominator)
+        if (abs_denom < EPS_MIN) then
+          safe_divide = default_value
+        else
+          safe_divide = numerator / denominator
+        endif
+      end function safe_divide
 !
       module xmdalloc
       contains
@@ -932,7 +951,7 @@ c       total     9*nblack
 
       integer :: i, iter, irpnt, ierror
       double precision :: res0, omega, omegah, beta, betah, alpha,
-     [                 resmax, temp1, temp2, temp, verysmall
+     [                resmax, temp1, temp2, temp, verysmall, safe_divide
       logical :: conv, rescal
 
       double precision, dimension(:), allocatable :: q, qb, aqb, reso,
@@ -989,8 +1008,8 @@ c
         enddo
 
 !       omega = (betah/beta)*(omegah/alpha)
-        omega = betah/(beta+sign(verysmall, beta)) *
-     [          omegah/(alpha+sign(verysmall, alpha))
+        omega = safe_divide(betah, beta, 0.0d0) *
+     [          safe_divide(omegah, alpha, 0.0d0)
         beta = betah
         do i = 1, nblack
           q(i) = res(i)+omega*(q(i)-alpha*aqb(i))
@@ -1013,7 +1032,7 @@ c
         enddo
 
 !       omegah = betah/temp1
-        omegah = betah/(temp1+sign(verysmall, temp1))
+        omegah = safe_divide(betah, temp1, 0.0d0)
 
         do i = 1, nblack
           s(i) = res(i) - omegah*aqb(i)
@@ -1035,7 +1054,7 @@ c
         enddo
 
 !       alpha = temp2/temp1
-        alpha = temp2/(temp1+sign(verysmall, temp1))
+        alpha = safe_divide(temp2, temp1, 0.0d0)
 
         resmax = 0.0d+0
         temp1 = 0.0d+0
@@ -1117,7 +1136,8 @@ c
 c     local variables
 c
       integer :: i, iter, irpnt, ierror
-      double precision :: temp, res0, rvkm, rvk, aconj, omega, resmax
+      double precision :: temp, res0, rvkm, rvk, aconj, omega, resmax, 
+     1  safe_divide      
       logical conv
 c
 c     work arrays
@@ -1191,7 +1211,7 @@ c
 c       {q} <- {v} and {aq} <- {avk}
       
         aconj = 0.0d0
-        if (iter > 0) aconj = rvk/rvkm
+        if (iter > 0) aconj = safe_divide(rvk, rvkm, 0.0d0)
       
         do i = 1, nblack
           q(i) = v(i) + aconj * q(i)
@@ -1203,7 +1223,7 @@ c       {q} <- {v} and {aq} <- {avk}
           omega = omega + q(i)*aq(i)
         enddo
   
-        omega = rvk/omega
+        omega = safe_divide(rvk, omega, 0.0d0)
         rvkm = rvk
   
         resmax = 0.0d+0
@@ -1229,7 +1249,14 @@ c       {q} <- {v} and {aq} <- {avk}
         if(miout.ge.1)then
           write(miunit,691) iter, omega, temp, resmax
  691     format (10x,1p,'iter = ',i5,2x,'omega = ',d12.5,
-     *         2x,'absolute = ',d12.5,2x,'rms  = ',d12.5)          
+     *         2x,'absolute = ',d12.5,2x,'rms  = ',d12.5)
+          ! Enhanced debugging output
+          if (miout >= 2) then
+            if (abs(omega) < 1.0d-15) write(miunit,*) 
+     1        'Warning: Very small omega =', omega
+            if (abs(aconj) < 1.0d-15) write(miunit,*) 
+     1        'Warning: Very small aconj =', aconj
+          endif          
         endif
         
         if (conv) then
@@ -1256,6 +1283,7 @@ c
 c     update red node solution using black node
 c
       implicit none
+      double precision  safe_divide
       double precision :: a(nja), xx(n), b(n)
       integer :: ia(n+1), ja(nja), REDorder(nred), n, nja, nred
 c
@@ -1275,7 +1303,7 @@ c     assume diagonal is 1
           xx(iold) = xx(iold) - a(kk) * xx(ja(kk))
         enddo
 
-        xx(iold) = xx(iold) / a( ia(iold) )
+        xx(iold) = safe_divide(xx(iold), a(ia(iold)), 0.0d0)
       enddo
 
       end subroutine xmdgtred
@@ -1296,6 +1324,7 @@ c     input: b, af, iaf, jaf, idiagf, njaf, temp, nblack
 c     output: x
 c
       implicit none
+      double precision safe_divide
       integer :: njaf, iaf(nblack+1), jaf(njaf), idiagf(nblack), nblack
       double precision :: b(nblack), af(njaf), temp(nblack)
 c
@@ -1323,7 +1352,7 @@ c
         do k = idiagf(i)+1, iaf(i+1)-1
           temp(i) = temp(i)-temp( jaf(k) )*af(k)
         enddo
-        temp(i) = temp(i)/af( idiagf(i) )
+        temp(i) = safe_divide(temp(i), af(idiagf(i)), 0.0d0)
       enddo
 
       end subroutine xmdilusl
@@ -1603,7 +1632,8 @@ c       total    2*nblack + 2*(north+1)*nblack + north
 
 
       integer :: i, k, iter, j, i2, irpnt, ipnt, ierror
-      double precision :: temp, res0, aqr, alpha, omega, resmax, avkaq
+      double precision :: temp, res0, aqr, alpha, omega, resmax, avkaq, 
+     1  safe_divide
       logical :: conv
 
       double precision, dimension(:), allocatable :: avk, aqaq, q,
@@ -1688,7 +1718,7 @@ c         q(ipnt+i) = v(i)
           do i = 1, nblack
             avkaq = avkaq + avk(i)*aq(i2+i)
           enddo
-          alpha = -avkaq/aqaq(j)
+          alpha = -safe_divide(avkaq, aqaq(j), 0.0d0)
           do i = 1, nblack
             q(ipnt+i) = q(ipnt+i) + alpha*q(i2+i)
             aq(ipnt+i) = aq(ipnt+i) + alpha*aq(i2+i)
@@ -1702,11 +1732,7 @@ c         q(ipnt+i) = v(i)
           temp = temp + aq(ipnt+i)*aq(ipnt+i)
         enddo
         aqaq(k) = temp
-        IF(AQR.EQ.0.0d+0)THEN
-          omega = 0.0d+0
-        ELSE
-           omega = aqr/aqaq(k)  
-        ENDIF
+        omega = safe_divide(aqr, aqaq(k), 0.0d0)
         
         resmax = 0.0d+0
         temp = 0.0d+0
@@ -1732,7 +1758,12 @@ c         q(ipnt+i) = v(i)
         if(miout.ge.1)then
           write(miunit,691) iter, omega, temp, resmax
  691     format (10x,1p,'iter = ',i5,2x,'omega = ',d12.5,
-     *         2x,'absolute = ',d12.5,2x,'rms  = ',d12.5)          
+     *         2x,'absolute = ',d12.5,2x,'rms  = ',d12.5)
+          ! Enhanced debugging output
+          if (miout >= 2) then
+            if (abs(omega) < 1.0d-15) write(miunit,*) 
+     1       'Warning: Very small omega =', omega
+          endif          
         endif
         
         if (conv) then
@@ -1777,6 +1808,7 @@ c      output:
 c             amltx()         mulitiplication of [a]{x}in reduced system, i.e., [Abb']{Xb}
 c
       implicit none
+      double precision safe_divide
       integer :: n, nja, nblack, nred, ia(n+1), ja(nja),
      [        RBorder(nblack), REDorder(nred)
       double precision :: a(nja), amltx(nblack), xx(n)
@@ -1811,7 +1843,7 @@ c     calculate Xr = -Dr^{-1} * Arb * Xb
           xx(iold) = xx(iold) - a(kk) * xx(ja(kk))
         enddo
 
-        xx(iold) = xx(iold) / a( ia(iold) )
+        xx(iold) = safe_divide(xx(iold), a(ia(iold)), 0.0d0)
 
       enddo
 

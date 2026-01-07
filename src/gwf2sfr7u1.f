@@ -2000,7 +2000,8 @@ C     -----------------------------------------------------------------
       DOUBLE PRECISION fbcheck, hld, totflwt, sbdthk, thetas, epsilon, 
      +                 thr, thet1, dvrsn, rhsh1, hcofh1, rhsh2, 
      +                 hcofh2, depthtr, dwdh, CSTRSMOOTH
-      DOUBLE PRECISION wetpermsmooth, deltinc
+      DOUBLE PRECISION wetpermsmooth, deltinc, depthave
+
 !     DOUBLE PRECISION rhsh1, hcofh1, rhsh2, hcofh2
 !rsr  DOUBLE PRECISION grad, hdiff
       REAL areamax, avhc, errold, fks, ha, qcnst, seep, 
@@ -2060,6 +2061,7 @@ C
 C3------DETERMINE LAYER, ROW, COLUMN OF EACH REACH.
         DO l = 1, NSTRM
           lfold = l
+          depthave = 0.0d0
           IF ( Nfoldflbt==1 ) lfold = 1
 !          flowin = 0.0D0
           flowin = strm(10, l)
@@ -3456,9 +3458,10 @@ C76-----ADD TERMS TO RHS AND HCOF IF FLOBOT IS NOT ZERO.
               hstrave = hstrave + HSTRM(l,i)
             END DO
             hstrave = hstrave/FLOAT(numdelt)
+            depthave = hstrave - strtop
             cstrsmooth = cstr
             IF ( icalc.EQ.1 ) cstrsmooth = cstr*
-     +                        smoothsfr(hstrave,dwdh)
+     +                        smoothsfr(depthave,dwdh)
             IF ( ABS(SUMLEAK(l)).GT.0.0 ) THEN
 C
 C77-----ADD TERMS TO RHS AND HCOF WHEN GROUNDWATER HEAD LESS THAN
@@ -4494,7 +4497,7 @@ C         IBD IS EQUAL TO 1. revised dep 5/10/2006
               IF(IUNSTR.EQ.0)THEN
       IF ( ibd.EQ.1 ) CALL UBUDSV(Kkstp, Kkper, text, iout1, BUFF, NCOL,
      +                            NROW, NLAY, IOUT)
-              ELSE
+      ELSE
       IF ( ibd.EQ.1 ) CALL UBUDSVU(Kkstp, Kkper, text, iout1, BUFF,
      +                            NODES, IOUT,pertim,totim)
               ENDIF
@@ -4519,7 +4522,7 @@ C       WHEN STANDARD UNFORMATTED BUDGET. revised dep 5/10/2006
               BUFF(NN) = zero
         END DO
         DO l = 1, NSTRM
-          NN =  ISTRM(1,L)     !   THIS IS WRONG ALSO WHERE NN = l  ! This is wrong - for segments should be 4,l   ISTRM(1, l)
+          NN =  ISTRM(6,L)     !   fixed according to Jim R. 11/13/2025
           BUFF(NN) = BUFF(NN) + STRM(9, l)
 Cdep   added compact budget option for streamflow out of reach
           IF(IUNSTR.EQ.0)THEN
