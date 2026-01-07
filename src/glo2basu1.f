@@ -362,8 +362,7 @@ C5------SET DEFAULT FILE ATTRIBUTES.
       FILACT=' '
 C4A-IHM--ALLOW FOR UNFORMATTED PACKAGES WITH A NEGATIVE UNIT NUMBER
       IF(IU.LT.0)THEN
-        FMTARG = 'UNFORMATTED'
-        ACCARG = 'STREAM'
+        FMTARG = 'BINARY'
         IU = ABS(IU)
       ENDIF
 C
@@ -372,8 +371,8 @@ C6------SPECIAL CHECK FOR 1ST FILE.
         IF(FILTYP.EQ.'LIST') THEN
           IOUT=IU
           OPEN(UNIT=IU,FILE=FNAME(1:IFLEN),STATUS='REPLACE',
-     1          FORM='FORMATTED',ACCESS='SEQUENTIAL'
-     1          )
+     1          FORM='FORMATTED',ACCESS='SEQUENTIAL',SHARE = 'DENYNONE'
+     1          , BUFFERED='NO')
           WRITE(IOUT,60) MFVNAM,SPACES(1:INDENT),VERSION(1:LENVER)
 60        FORMAT(34X,'USG-TRANSPORT ',A,/,
      &             6X,' FURTHER  DEVELOPMENTS BASED ON MODFLOW-USG',/,
@@ -485,10 +484,10 @@ C13-----WRITE THE FILE NAME AND OPEN IT.
      &  1X,'FILE TYPE:',A,'   UNIT ',I4,3X,'STATUS:',A,/
      &  1X,'FORMAT:',A,3X,'ACCESS:',A)
 !kkz - ALWAYS BUFFERING. NO IF STATEMENT OR OPTION
-      OPEN(UNIT=IU,FILE=FNAME(1:IFLEN),FORM=FMTARG,  !allows sharing of files for parallel PEST runs
+      OPEN(UNIT=IU,FILE=FNAME(1:IFLEN),FORM=FMTARG, SHARE = 'DENYNONE',  !allows sharing of files for parallel PEST runs
      1      ACCESS=ACCARG,STATUS=FILSTAT,ACTION=FILACT,ERR=2000)
-c      OPEN(UNIT=IU,FILE=FNAME(1:IFLEN),FORM=FMTARG,  !allows sharing of files for parallel PEST runs
-c     1      ACCESS=ACCARG,STATUS=FILSTAT,ACTION=FILACT,
+c      OPEN(UNIT=IU,FILE=FNAME(1:IFLEN),FORM=FMTARG, SHARE = 'DENYNONE',  !allows sharing of files for parallel PEST runs
+c     1      ACCESS=ACCARG,STATUS=FILSTAT,ACTION=FILACT,BUFFERED='YES',
 c     2      ERR=2000)
       IF(IFLUSH.NE.0) THEN   !kkz - if not STATUS=OLD, then assume an output file to flush at the end of each timestep
         CFLUSH = CFLUSH + 1    !kkz - increment counter for files to be flushed

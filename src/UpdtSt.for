@@ -137,7 +137,7 @@ C1 -------OPEN FILE IF IT WAS CLOSED FOR NON-ARCHIVE MODE
         fname = fnames (cnt)
         iflen = iflens(cnt)
         open(unit=unitno,file=fname(1:iflen),status='old',
-     &         form=fmtargs(cnt),err = 10,
+     &         form=fmtargs(cnt),err = 10,share='DENYNONE',
      &         ACCESS=accargs(cnt),ACTION=FILACTS(cnt))
 C---------------------------------------------------------------
 C2 -------POSITION READ FILES AFTER 1 DATA LINE FOR STRESS PERIOD INFORMATION        
