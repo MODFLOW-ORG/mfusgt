@@ -100,8 +100,10 @@ jobs:
         working-directory: ${{ env.PROGRAM_NAME }}/bin
         if: runner.os == 'macOS'
         run: |
-          otool -L gridgen
-          lipo -info gridgen
+          otool -L mfusgt
+          otool -L mfusgtdbl
+          lipo -info mfusgt
+          lipe -info mfusgtdbl
 
       - name: Show build log
         if: failure()
