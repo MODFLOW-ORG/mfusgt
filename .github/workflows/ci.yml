@@ -103,7 +103,7 @@ jobs:
           otool -L mfusgt
           otool -L mfusgtdbl
           lipo -info mfusgt
-          lipe -info mfusgtdbl
+          lipo -info mfusgtdbl
 
       - name: Show build log
         if: failure()
