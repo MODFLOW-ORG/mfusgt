@@ -1,4 +1,4 @@
-[project]
+[workspace]
 name = "mfusgt"
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "linux-aarch64", "osx-arm64", "osx-64"]
@@ -14,6 +14,7 @@ modflow-devtools = "*"
 [tasks]
 
 # meson build for triangle
+clean = { cmd = "rm -rf builddir" }
 setup = { cmd = "meson setup --prefix=$(pwd) --bindir=bin", env = { PKG_CONFIG_PATH = "$CONDA_PREFIX/lib/pkgconfig" } }
 build = "meson install -C"
 
