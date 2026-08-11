@@ -116,7 +116,7 @@ jobs:
         if: ${{ matrix.release == 'yes' && runner.os == 'Linux' }}
         working-directory: ${{ env.PROGRAM_NAME }}
         run: |
-          zip -r ${{ env.PROGRAM_NAME }}_source.zip meson.build src/ test/A.poly
+          zip -r ${{ env.PROGRAM_NAME }}_source.zip meson.build meson.options src/ test/A.poly
           ls -lha *.zip
 
       - name: Create zip file on MacOS and Linux
