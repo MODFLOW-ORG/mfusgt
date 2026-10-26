@@ -1,5 +1,15 @@
 
 mfusgt_sources = files(
+ 'blas1_d.f90',
+ 'ilut.f90',
+ 'rcm.f90',
+ 'sparsekit.f90',
+ 'ims8misc.f90',
+ 'ims8reordering.f90',
+ 'ims8base.f90',
+ 'ims8linear.f90',
+ 'ims7wrap.f90',
+ 'ims_shim.f90',
  'cln2basu1.f',
  'cln2props1.f',
  'density.f',
@@ -35,6 +45,7 @@ mfusgt_sources = files(
  'gwt2bndsu1.f',
  'gwt2dptu1.f',
  'gwt2mdtu1.for',
+ 'gwt2rxnu1.f',
  'lak_gag_sfr_modules.f',
  'parutl7.f',
  'pcgu7.f',

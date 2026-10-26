@@ -21,7 +21,7 @@
         INTEGER, POINTER, DIMENSION(:) :: IATMP
         INTEGER, POINTER :: NJATMP
         INTEGER, SAVE,    DIMENSION(:), POINTER  ::JA
-        INTEGER, SAVE,    DIMENSION(:), POINTER ::JAFL          
+        INTEGER, SAVE,    DIMENSION(:), POINTER ::JAFL
         INTEGER, SAVE,    DIMENSION(:),ALLOCATABLE  ::JAS
         INTEGER, SAVE,    DIMENSION(:),ALLOCATABLE  ::ISYM
         INTEGER, SAVE,    DIMENSION(:),ALLOCATABLE  ::IVC
@@ -38,7 +38,7 @@
         DOUBLE PRECISION, SAVE, DIMENSION(:),ALLOCATABLE  ::TOP
         DOUBLE PRECISION, SAVE, DIMENSION(:),ALLOCATABLE  ::PGF
         DOUBLE PRECISION, SAVE, DIMENSION(:),ALLOCATABLE  ::AREA
-        REAL, SAVE, DIMENSION(:),ALLOCATABLE  ::FAHL        
+        REAL, SAVE, DIMENSION(:),ALLOCATABLE  ::FAHL
         REAL, SAVE, DIMENSION(:),ALLOCATABLE  ::CL1,CL2
         REAL, SAVE, DIMENSION(:),ALLOCATABLE  ::ARAD
         INTEGER, SAVE,    DIMENSION(:),    ALLOCATABLE  ::NODLAY
@@ -105,7 +105,7 @@ C -----------------------------------------------------------------------
      *   IAUXSV,IBDOPT,IATS,IBUDFLAT,ICBCFLAT,IHDDFLAT,ISPCFLAT
         INTEGER, SAVE, POINTER :: IFAST,ISPFAST,ITSFAST,IUGFAST,IUCFAST,
      *    IUDFAST,IFASTH,IFASTC,ISPFASTC,ITSFASTC,IUGFASTC,IUCFASTC,
-     *    IUDFASTC,IUMFASTC  
+     *    IUDFASTC,IUMFASTC
         INTEGER, SAVE, POINTER  ::IPRTIM,IPEROC,ITSOC,ICHFLG,IFRCNVG
         DOUBLE PRECISION,  SAVE, POINTER  ::DELT,PERTIM,TOTIM
         DOUBLE PRECISION, SAVE, POINTER :: DELTAT,TMINAT,TMAXAT,TADJAT,
@@ -115,7 +115,7 @@ C -----------------------------------------------------------------------
         DOUBLE PRECISION, SAVE, POINTER :: DTBOOTSCALE
         DOUBLE PRECISION, DIMENSION(:),ALLOCATABLE  ::BOOTSLOPE
         DOUBLE PRECISION, DIMENSION(:),ALLOCATABLE  ::BOOTSCALE
-        DOUBLE PRECISION, DIMENSION(:),ALLOCATABLE  ::HREADBOOT       
+        DOUBLE PRECISION, DIMENSION(:),ALLOCATABLE  ::HREADBOOT
         DOUBLE PRECISION,  SAVE, DIMENSION(:),ALLOCATABLE ::TIMOT,TIMOTC
         REAL,              SAVE, POINTER  ::HNOFLO
         CHARACTER(LEN=20), SAVE, POINTER   ::CHEDFM,CDDNFM,CBOUFM,CSPCFM
@@ -124,13 +124,13 @@ C -----------------------------------------------------------------------
         CHARACTER(LEN=16), SAVE, DIMENSION(:),   ALLOCATABLE ::VBNM
         INTEGER, SAVE, POINTER  ::IDDREF,IDDREFNEW
         INTEGER,           SAVE, DIMENSION(:),  ALLOCATABLE  ::IFLUSHS !kkz for list of binary output unit numbers to flush
-        INTEGER,           SAVE, POINTER   ::CFLUSH !kkz - count of binary file unit numbers to flush at ends of time steps        
+        INTEGER,           SAVE, POINTER   ::CFLUSH !kkz - count of binary file unit numbers to flush at ends of time steps
       END MODULE GWFBASMODULE
 C
 C -----------------------------------------------------------------------
       MODULE GWFBCFMODULE
        INTEGER,SAVE,POINTER::IBCFCB,IWDFLG,IWETIT,IHDWET,IKCFLAG,
-     1  IKVFLAG,IBPN,IDRY,ITABRICH,INTRICH,NUTABROWS,NUZONES 
+     1  IKVFLAG,IBPN,IDRY,ITABRICH,INTRICH,NUTABROWS,NUZONES
        REAL, SAVE, POINTER    ::WETFCT,HDRY
        INTEGER, SAVE,  ALLOCATABLE,   DIMENSION(:)     ::LAYCON
        INTEGER, SAVE,  ALLOCATABLE,   DIMENSION(:)     ::LAYAVG,LAYAVGV
@@ -153,10 +153,10 @@ C
         REAL,    SAVE,   ALLOCATABLE, DIMENSION(:) ::VKCB
         REAL,    SAVE,   ALLOCATABLE, DIMENSION(:) ::HANI
         REAL,    SAVE,   ALLOCATABLE, DIMENSION(:) ::HK
-        DOUBLE PRECISION,  SAVE,  ALLOCATABLE,  DIMENSION(:) :: HWADIGW 
+        DOUBLE PRECISION,  SAVE,  ALLOCATABLE,  DIMENSION(:) :: HWADIGW
         DOUBLE PRECISION,  SAVE,  ALLOCATABLE,  DIMENSION(:) :: DWADIGW
       END MODULE GWFBCFMODULE
-C 
+C
 C -------------------------------------------------------------------------------------
       MODULE CLN1MODULE
         INTEGER, SAVE,POINTER :: NCLN,ICLNCB,ICLNHD,ICLNDD,ICLNIB,
@@ -172,33 +172,42 @@ C    1           NJA_CLN, NCLNNDS,NCLNGWC,NCONDUITYP,NRECTYP,            !aq CLN
         INTEGER, SAVE,    DIMENSION(:),POINTER  ::IA_CLN
         INTEGER, SAVE,    DIMENSION(:),POINTER  ::JA_CLN
         INTEGER, SAVE,    DIMENSION(:),POINTER  ::IDXGLO_CLN
+C-------ACLNNDS: 7 columns - (1)GLOBAL NODE, (2)IFTYPE, (3)IFDIR, (4)FLENG, (5)FELEV, (6)FANGLE, (7)ISHAPE
         DOUBLE PRECISION, SAVE,    DIMENSION(:,:),ALLOCATABLE  ::ACLNNDS
         REAL, SAVE,    DIMENSION(:,:),ALLOCATABLE  ::ACLNGWC
         DOUBLE PRECISION, SAVE,   DIMENSION(:,:),ALLOCATABLE  ::ACLNCOND
         REAL, SAVE,    DIMENSION(:,:),ALLOCATABLE  :: BHEPROP
          REAL, SAVE,    DIMENSION(:,:),ALLOCATABLE  ::ACLNREC
-C-------FOR FLOW TO DRY CELL FORMULATION        
+C-------FOR GENERAL SHAPE CLN (ISHAPE=3) WITH TABULAR INPUT
+C-------ACLNGEN: (4, NGENTABROWS, NGENSHPTYP) - DEPTH, AREA, WETPERI, TOPWID
+C-------ACLNGENK: CONDUITK PER TYPE; ACLNGENA: MAX AREA PER TYPE; ACLNGENP: MAX PERIMETER PER TYPE
+        INTEGER, SAVE, POINTER :: NGENSHPTYP, NGENTABROWS
+        REAL, SAVE, DIMENSION(:,:,:), ALLOCATABLE :: ACLNGEN
+        REAL, SAVE, DIMENSION(:), ALLOCATABLE :: ACLNGENK
+        DOUBLE PRECISION, SAVE, DIMENSION(:), ALLOCATABLE :: ACLNGENA
+        DOUBLE PRECISION, SAVE, DIMENSION(:), ALLOCATABLE :: ACLNGENP
+C-------FOR FLOW TO DRY CELL FORMULATION
         DOUBLE PRECISION,  SAVE, ALLOCATABLE,  DIMENSION(:) ::HWADICC
         DOUBLE PRECISION,  SAVE, ALLOCATABLE,  DIMENSION(:) ::HWADICG
         DOUBLE PRECISION,  SAVE, ALLOCATABLE,  DIMENSION(:) ::DWADICC
         DOUBLE PRECISION,  SAVE, ALLOCATABLE,  DIMENSION(:) ::DWADICG
-C-------FOR TURBULENT FLOW FORMULATION 
+C-------FOR TURBULENT FLOW FORMULATION
         REAL, SAVE, POINTER :: GRAV, VISK
-        
+
       END MODULE CLN1MODULE
 C
 C -------------------------------------------------------------------------------------
       MODULE SMSMODULE
       IMPLICIT NONE
       DOUBLE PRECISION, PARAMETER :: EPSILON = 1.0E-6
-      DOUBLE PRECISION, PARAMETER :: CLOSEZERO = 1.0E-15      
+      DOUBLE PRECISION, PARAMETER :: CLOSEZERO = 1.0E-15
       DOUBLE PRECISION, SAVE, POINTER :: Theta
       DOUBLE PRECISION, SAVE, POINTER :: Akappa, Gamma, Amomentum,
      *  Breduc, Btol,RES_LIM
       DOUBLE PRECISION, SAVE, DIMENSION(:), POINTER ::AMATFL
       DOUBLE PRECISION, SAVE, POINTER :: HCLOSE, HICLOSE,BIGCHOLD,BIGCH
       INTEGER, SAVE, POINTER :: ITER1,MXITER,LINMETH,NONMETH,Numtrack,
-     *  IPRSMS,IBFLAG,isolverfile     
+     *  IPRSMS,IBFLAG,isolverfile
       DOUBLE PRECISION, DIMENSION(:),ALLOCATABLE  :: CELLBOTMIN
       DOUBLE PRECISION, DIMENSION(:),ALLOCATABLE  ::HTEMP
 CSP - THIS IS AMAT      DOUBLE PRECISION, SAVE, DIMENSION(:), ALLOCATABLE :: A
@@ -218,6 +227,20 @@ CSP - THIS IS HNEW      DOUBLE PRECISION, SAVE, DIMENSION(:), ALLOCATABLE :: Hch
       DOUBLE PRECISION, SAVE, POINTER::MaxRcutoff
       INTEGER, SAVE, POINTER      ::ICUTOFF,NoMoreRcutoff,ITRUNCNEWTON
       ! End DM
+C     -- Per-stress-period solver-setting overrides (opt-in via the SMS OPTIONS
+C        keyword STRESSPERIODSETTINGS; MF6-style BEGIN/END PERIOD blocks read in
+C        SMS7U1AR). Outer tolerances (HCLOSE/HICLOSE/MXITER/ITER1), the per-solve
+C        linear tolerances (HICLOSE/RCLOSE/ITER1, propagated to the active solver
+C        each SP), and the nonlinear stabilization block. Structural linear
+C        parameters (LEVEL/ordering/preconditioner) are left alone. SPSVAL/SPSSET
+C        are sized (NSPSP,NPER) at AR and forward-filled (a block applies from its
+C        SP onward until changed). MXITERCEIL is the item-1 MXITER allocation
+C        ceiling; a per-SP MXITER is clamped to it.
+      INTEGER, SAVE :: ISPS = 0            ! 1 = STRESSPERIODSETTINGS is on
+      INTEGER, SAVE :: NSPSP = 14          ! number of overridable parameters
+      INTEGER, SAVE :: MXITERCEIL = 0      ! item-1 MXITER (allocation ceiling)
+      DOUBLE PRECISION, SAVE, ALLOCATABLE :: SPSVAL(:,:)  ! (NSPSP,NPER) value
+      INTEGER, SAVE, ALLOCATABLE :: SPSSET(:,:)           ! (NSPSP,NPER) 1=set
       END MODULE SMSMODULE
 C
 C--------------------------------------------------------------------------
@@ -251,7 +274,7 @@ C--------------------------------------------------------------------------
           DOUBLE PRECISION,SAVE,ALLOCATABLE,DIMENSION(:) :: INITPGF
       END MODULE
 C
-C -------------------------------------------------------------------------------------      
+C -------------------------------------------------------------------------------------
       MODULE GWTBCTMODULE
        INTEGER,SAVE,POINTER::IBCTCB,MCOMP,ITVD,IADSORB,ICT,NTITER,IDISP,
      *   IXDISP,IZOD,IFOD,IHEAT,MCOMPT,NTCOMP,IDISPCLN,IMULTI,NSEQITR,
@@ -268,7 +291,7 @@ C ------------------------------------------------------------------------------
        REAL, SAVE, ALLOCATABLE,   DIMENSION(:,:) ::ADSORB,FLICH,
      1  ZODRW,FODRW,ZODRS,FODRS,ZODRAW,FODRAW
        REAL, SAVE, ALLOCATABLE,   DIMENSION(:,:) ::VELNOD
-       REAL, SAVE,     ALLOCATABLE,   DIMENSION(:) :: VXL, VYL       
+       REAL, SAVE,     ALLOCATABLE,   DIMENSION(:) :: VXL, VYL
        REAL, SAVE, ALLOCATABLE,  DIMENSION(:) :: DLX,DLY,DLZ,
      1   ATXY,ATYZ,ATXZ
        REAL, SAVE, ALLOCATABLE,  DIMENSION(:) :: ALXY,ALYZ,ALXZ
@@ -278,6 +301,7 @@ C ------------------------------------------------------------------------------
        DOUBLE PRECISION,    SAVE, DIMENSION(:,:,:), ALLOCATABLE ::VBVLT
        CHARACTER(LEN=16), SAVE, DIMENSION(:,:),   ALLOCATABLE ::VBNMT
        INTEGER, SAVE, POINTER  ::MSUMT
+       INTEGER, SAVE, ALLOCATABLE, DIMENSION(:) :: MSUMTC
        INTEGER, SAVE, DIMENSION(:), ALLOCATABLE ::  FLrcC
        DOUBLE PRECISION, SAVE, DIMENSION(:), ALLOCATABLE :: FCncg
        DOUBLE PRECISION, SAVE, DIMENSION(:), ALLOCATABLE :: ADMAT
@@ -286,7 +310,7 @@ C ------------------------------------------------------------------------------
        INTEGER,           SAVE, DIMENSION(:),  ALLOCATABLE ::NODETIBC
        INTEGER, POINTER :: NICB1
        DOUBLE PRECISION, SAVE, DIMENSION(:,:),ALLOCATABLE  ::CTIB
-       REAL, SAVE, POINTER :: HTCONDW, RHOW, HTCAPW 
+       REAL, SAVE, POINTER :: HTCONDW, RHOW, HTCAPW
        REAL, SAVE, ALLOCATABLE, DIMENSION(:) :: HTCONDM, HTCONDS,HTCONDT
        CHARACTER (LEN=200), SAVE :: CROOTNAME
        DOUBLE PRECISION, SAVE, POINTER :: TIMEWEIGHT
@@ -299,12 +323,28 @@ C ------------------------------------------------------------------------------
        REAL, SAVE, ALLOCATABLE, DIMENSION(:,:) :: SOLLIMVAR, SOLSLOPEVAR
       END MODULE GWTBCTMODULE
 C
-C------------------------------------------------------------------------------      
+C------------------------------------------------------------------------------
+      MODULE GWTRXNMODULE
+C-------GENERALIZED MULTI-SPECIES KINETIC REACTION MODULE (REACTION1 OPTION)
+       INTEGER, SAVE, POINTER :: IREACT,IRXNCB,NRXN,NRXPART
+       INTEGER, SAVE, ALLOCATABLE, DIMENSION(:) :: NPARTL,NPARTR
+       DOUBLE PRECISION, SAVE, ALLOCATABLE, DIMENSION(:) :: AKRXN
+       INTEGER, SAVE, ALLOCATABLE, DIMENSION(:,:) :: IPARTL,IPARTR
+       REAL, SAVE, ALLOCATABLE, DIMENSION(:,:) :: ASTOL,ASTOR
+       REAL, SAVE, ALLOCATABLE, DIMENSION(:) :: AMWCOMP
+       DOUBLE PRECISION, SAVE, ALLOCATABLE, DIMENSION(:,:) :: RXNQQ
+       DOUBLE PRECISION, SAVE, ALLOCATABLE, DIMENSION(:,:) :: RXNQQIM
+       DOUBLE PRECISION, SAVE, ALLOCATABLE, DIMENSION(:,:) :: RXNCONCO
+       DOUBLE PRECISION, SAVE, ALLOCATABLE, DIMENSION(:,:) :: RXNCONCOIM
+      END MODULE GWTRXNMODULE
+C
+C------------------------------------------------------------------------------
             MODULE GWTDPTMODULE
         INTEGER,SAVE,POINTER::IDPTCB,IDPTCON,IC_IBNDIN_FLG,IADSORBIM,
-     *  IDISPIM,IZODIM,IFODIM,IAW_ADSORBIM
+     *  IDISPIM,IZODIM,IFODIM,IAW_ADSORBIM,ISD_MASS_TR
         INTEGER, SAVE, ALLOCATABLE, DIMENSION (:) :: ICBUNDIM
         REAL, SAVE, ALLOCATABLE, DIMENSION(:) ::DDTTR
+        REAL, SAVE, ALLOCATABLE, DIMENSION(:,:) ::DDTTRSD
 C
         DOUBLE PRECISION,SAVE,ALLOCATABLE,DIMENSION(:,:) :: CONCIM
         DOUBLE PRECISION,SAVE,ALLOCATABLE,DIMENSION(:,:) :: CONCOIM
@@ -317,34 +357,34 @@ C
         DOUBLE PRECISION, SAVE,ALLOCATABLE,DIMENSION(:) :: OFFDDTM
         DOUBLE PRECISION, SAVE,ALLOCATABLE,DIMENSION(:) :: OFFDDTIM
       END MODULE GWTDPTMODULE
-C 
-C----------------------------------------------------------------------------------    
+C
+C----------------------------------------------------------------------------------
       MODULE AW_ADSORBMODULE
        INTEGER,SAVE,POINTER :: IAREA_FN,IKAWI_FN,ITAB_AWI,NAZONES,
      1    NATABROWS
        INTEGER, SAVE, ALLOCATABLE, DIMENSION(:) :: IAWIZONMAP
-       REAL, SAVE, POINTER :: ROG_SIGMA,SIGMA_RT 
+       REAL, SAVE, POINTER :: ROG_SIGMA,SIGMA_RT
        REAL, SAVE, ALLOCATABLE, DIMENSION(:) :: AWAMAX,
      1   AWAREA_X2,AWAREA_X1,AWAREA_X0,AREA_AWI,AREA_AWIO
        REAL, SAVE, ALLOCATABLE, DIMENSION(:,:) :: ALANGAW,BLANGAW,AK_AWI
        REAL, SAVE, ALLOCATABLE, DIMENSION(:,:,:) :: AWI_AREA_TAB
        REAL, SAVE, ALLOCATABLE, DIMENSION(:,:,:,:) :: AWI_KAWI_TAB
       END MODULE
-C 
-C----------------------------------------------------------------------------------      
+C
+C----------------------------------------------------------------------------------
       MODULE AW_ADSORBIMMODULE
        INTEGER,SAVE,POINTER :: IAREA_FNIM,IKAWI_FNIM,ITAB_AWIIM,
      1   NAZONESIM, NATABROWSIM
-       INTEGER, SAVE, ALLOCATABLE, DIMENSION(:) :: IAWIZONMAPIM 
+       INTEGER, SAVE, ALLOCATABLE, DIMENSION(:) :: IAWIZONMAPIM
        REAL, SAVE, POINTER :: SIGMA_RTIM,ROG_SIGMAIM
        REAL, SAVE, ALLOCATABLE, DIMENSION(:) :: AWAMAXIM,
      1   AWAREA_X2IM,AWAREA_X1IM,AWAREA_X0IM,AREA_AWIIM,AREA_AWIIMO
        REAL, SAVE, ALLOCATABLE, DIMENSION(:,:) :: ALANGAWIM,BLANGAWIM,
-     1    AK_AWIIM       
+     1    AK_AWIIM
        REAL, SAVE, ALLOCATABLE, DIMENSION(:,:,:) :: AWI_AREA_TABIM
        REAL, SAVE, ALLOCATABLE, DIMENSION(:,:,:,:) :: AWI_KAWI_TABIM
       END MODULE
-C 
-C-------------------------------------------------------------------------------------        
-      
-      
+C
+C-------------------------------------------------------------------------------------
+
+

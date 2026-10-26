@@ -658,12 +658,12 @@ C
         DEALLOCATE(INIEVT,NIEVT, STAT = ALLOC_ERR)
         DEALLOCATE(INETS,TIMEVT,IETSRD, STAT = ALLOC_ERR)
 C-------ETS-related allocations
-        DEALLOCATE(IETSOPT, STAT = ALLOC_ERR)
         DEALLOCATE(IZNEVT, STAT = ALLOC_ERR)
         IF(IETSOPT.EQ.1)THEN
           DEALLOCATE(MXZNEVT, STAT = ALLOC_ERR)
           DEALLOCATE(tstartevt,tendevt,factrevt,etsevt,STAT = ALLOC_ERR)
         ENDIF
+        DEALLOCATE(IETSOPT, STAT = ALLOC_ERR)        
 C-------Transport-related allocations
         IF(INBCT.GT.0)THEN
           DEALLOCATE(EVTF, STAT = ALLOC_ERR)

@@ -254,8 +254,7 @@ C8----------CALCULATE AVERAGE SATURATED THICKNESS BETWEEN CELLS N1 AND N2.
                 IF (HD1.LT.BOT(N1))HD1 = BOT(N1)
                 IF (HD2.LT.BOT(N2))HD2 = BOT(N2)
                 THKAVG = ((HD1-BOT(N1)) + (HD2-BOT(N2)))/2.              
-              ENDIF
-
+              ENDIF    
               HFB(7,II) = PGF(IAJS)
               TDW = THKAVG*HCDW
 C-------------FILL TERM AND DIAGONAL
@@ -314,7 +313,7 @@ C ------FIND BARRIER LOCATION AND ADJUST PGF
             TH0 = TOP(N1) - BOT(N1)
             TH1 = TOP(N2) - BOT(N2)
             IF(IVC(IAJS).EQ.1)THEN
-              THKAVG = 1.0
+                THKAVG = 1.0  
             ELSEIF(IVC(IAJS).EQ.2)THEN
               THKAVG = MIN(TH0,TH1)
             ELSE  

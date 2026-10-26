@@ -2,7 +2,7 @@
 name = "mfusgt"
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "linux-aarch64", "osx-arm64", "osx-64"]
-version = "2.6.2"
+version = "2.8.1"
 
 [dependencies]
 filelock = "*"

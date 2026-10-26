@@ -471,9 +471,9 @@ C3A-----INCONC<0, SO REUSE CONCENTRATION ARRAY FROM LAST STRESS PERIOD.
       ELSEif(INCONC.gt.0)then
         ICONCRCH = 0
         DO II=1,MCOMPT
-!          WRITE(IOUT,*)(' READING FOR COMPONENT NUMBER',MCOMPT)
-          WRITE(IOUT,*) ' READING FOR COMPONENT NUMBER',MCOMPT  !kkz - remove parentheses per JCH (alternative is to use a FORMAT)
           IF(IRCHCONC(II).NE.0)THEN
+            WRITE(iout,*)  
+            WRITE(IOUT,*) ' READING CONC FOR COMPONENT NUMBER',II       
             ICONCRCH = ICONCRCH + 1
             IF(IUNSTR.EQ.0)THEN
              CALL U2DREL(RCHCONC(1,ICONCRCH),ANAME(5),NROW,NCOL,

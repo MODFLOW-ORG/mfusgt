@@ -5,6 +5,7 @@
         PUBLIC :: PCGU7U1AP
         PUBLIC :: PCGU7U1DA
         PUBLIC :: PCGUSETDIMS
+        PUBLIC :: PCGU7_SET_TOLS
         PUBLIC :: ILINMETH
         INTEGER,SAVE,POINTER  :: ITER1C,IPC,ISCL,IORD,NITERC,NNZC,NIAC
         INTEGER,SAVE,POINTER  :: NIABCGS
@@ -1938,6 +1939,23 @@ C
 C-----RETURN
       RETURN
       END SUBROUTINE
-      
+C-----------------------------------------------------------------------
+      SUBROUTINE PCGU7_SET_TOLS(HCLOSE, RCLOSE, ITER1)
+C       Set the per-stress-period PCGU inner tolerances/iteration cap on the
+C       live solver so the change takes effect at the next solve with no
+C       structural rebuild. A negative HCLOSE/RCLOSE or non-positive ITER1
+C       means "leave unchanged". Structural parameters (IPC/ISCL/IORD) are
+C       not touched. Inert if the solver has not been allocated.
+        DOUBLE PRECISION, INTENT(IN) :: HCLOSE, RCLOSE
+        INTEGER, INTENT(IN) :: ITER1
+        IF (ASSOCIATED(HCLOSEPCGU) .AND. HCLOSE.GT.0.0D0)
+     &    HCLOSEPCGU = REAL(HCLOSE)
+        IF (ASSOCIATED(RCLOSEPCGU) .AND. RCLOSE.GT.0.0D0)
+     &    RCLOSEPCGU = REAL(RCLOSE)
+        IF (ASSOCIATED(ITER1C) .AND. ITER1.GT.0)
+     &    ITER1C = ITER1
+        RETURN
+      END SUBROUTINE
+
       END MODULE PCGUMODULE
 
