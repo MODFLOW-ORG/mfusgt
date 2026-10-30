@@ -283,10 +283,9 @@ C     ------------------------------------------------------------------
      *  DS,RHO2,RHO1,THCK,SATN,SATO,FTERM,DFTERM,SW,EKR,AKRCIMN
 C
 C     ------------------------------------------------------------------
-      IF(ISSFLG(KPER).EQ.1) RETURN
 C1--------INITALIZE ARRAYS
       IF(NONMETH.GT.0)THEN
-        ALLOCATE(AKRCIM(NODES))
+        IF(.NOT. ALLOCATED (AKRCIM)) ALLOCATE(AKRCIM(NODES))
       ENDIF
       DO N=1,NODES
         DIADDF(N) = 0.0
@@ -294,6 +293,7 @@ C1--------INITALIZE ARRAYS
         OFFDDFM(N) = 0.0
         OFFDDFIM(N) = 0.0
       ENDDO
+      IF(ISSFLG(KPER).EQ.1) RETURN      
 C-----------------------------------------------------------------------------
 C2------FILL STORAGE TERM ON DIAGONAL AND RHS OF IMMOBILE DOMAIN EQUATION
 C-----------------------------------------------------------------------------
@@ -746,6 +746,43 @@ C1----COPY NEW TO OLD VARIABLES
       DO 10 N=1,NODES
       SoIM(N) = SnIM(N)
    10 HOLDIM(N)=HNEWIM(N)
+C
+C4------RETURN
+      RETURN
+      END
+C------------------------------------------------------------------
+      SUBROUTINE GWF2DPF1RP
+C     ******************************************************************
+C     UPDATE IMMOBILE DOMAIN SATURATION IF NEEDED
+C     ******************************************************************
+C
+C        SPECIFICATIONS:
+C     ------------------------------------------------------------------
+      USE GLOBAL,      ONLY:NODES,NLAY,NODLAY,TOP,BOT
+      USE GWFBCFMODULE, ONLY: LAYCON
+      USE GWFDPFMODULE,ONLY:IBOUNDIM,SnIM,SoIM,HNEWIM
+      DOUBLE PRECISION HD,BBOT,TTOP,TOTTHICK,THCK
+C     ------------------------------------------------------------------
+C
+          DO K=1,NLAY
+C9A---------LOOP THROUGH EACH CELL IN LAYER
+            NNDLAY = NODLAY(K)
+            NSTRT = NODLAY(K-1)+1
+            DO N=NSTRT,NNDLAY
+              IF(IBOUNDIM(N).NE.0) THEN
+                IF(LAYCON(K).NE.0.OR.LAYCON(K).NE.2) THEN
+C9B---------------CALCULATE SATURATION OR SATURATED THICKNESS
+                  HD=HNEWIM(N)
+                  BBOT=BOT(N)
+                  TTOP=TOP(N)
+                  TOTTHICK = TTOP - BBOT
+                  CALL SAT_THIKIM(N,HD,TOTTHICK,BBOT,THCK,K,TTOP)
+                  SnIM(N)=THCK
+                  SoIM(N) = SnIM(N)
+                ENDIF
+              ENDIF
+            ENDDO
+          ENDDO
 C
 C4------RETURN
       RETURN

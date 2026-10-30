@@ -315,7 +315,7 @@ C     ------------------------------------------------------------------
       USE GWFDRTMODULE, ONLY:NDRTCL,DRTF,IDRTFL,drtflow,noddrt,
      1   MXSPREADNDS
 C
-      DOUBLE PRECISION EEL,C,H,RFPROP,HB
+      DOUBLE PRECISION EEL,C,H,RFPROP,HB,Q
 C     ------------------------------------------------------------------
 C
 C1------IF NDRTCL<=0 THERE ARE NO DRAINS. RETURN.
@@ -329,23 +329,47 @@ C2------PROCESS EACH CELL IN THE DRAIN-RETURN CELL LIST.
 C
 C3------GET NODE NUMBER OF CELL CONTAINING DRAIN.
         ND=DRTF(1,L)
+        INR = 0
+        IF (IDRTFL.GT.0) INR = DRTF(6,L)
 C
-C4-------IF THE CELL IS EXTERNAL SKIP IT.
-        IF (IBOUND(ND).LE.0) GOTO 100
+C4-------IF THE CELL IS EXTERNAL SKIP IT (ADVANCE IRT PAST SPREADING CELLS).
+        IF (IBOUND(ND).LE.0) THEN
+          IF (INR.LT.0) IRT = IRT - INR
+          GOTO 100
+        ENDIF
 C
 C5-------IF THE CELL IS INTERNAL GET THE DRAIN DATA.
         EL=DRTF(4,L)
         EEL=EL
         C=DRTF(5,L)
+        RFPROP = DRTF(9,L)
+        H = HNEW(ND)
 C6------IF C IS NEGATIVE IT IS A GHB CONDITION ELSE A DRAIN CONDITION        
         IF (C.LT.0) GO TO 200
 C---------------------------------------------------------------- 
 C7------FOR DRAINS: 
-        IF (HNEW(ND).LE.EEL) GO TO 100   !IF HEAD IS LOWER THAN DRAIN THEN SKIP THIS CELL.
+        IF (HNEW(ND).LE.EEL) THEN        !IF HEAD IS LOWER THAN DRAIN THEN SKIP THIS CELL.
+          IF (INR.LT.0) IRT = IRT - INR
+          GO TO 100
+        ENDIF
 C
 C8------HEAD IS HIGHER THAN DRAIN. ADD TERMS TO RHS AND HCOF AT THE SINK LOCATION
         AMAT(IA(ND))= AMAT(IA(ND))-C
-        RHS(ND)= RHS(ND)- C*EEL
+        RHS(ND)= RHS(ND)- C*EEL 
+        Q = RFPROP*C*(H-EEL)
+        GO TO 300 
+C----------------------------------------------------------------        
+C10-----FOR GHB CONDITIONS WITH Q-RETURN: 
+200     CONTINUE         
+        C = -C
+        HB = EEL
+C
+C6------ADD TERMS TO RHS AND HCOF AT SINK LOCATION.
+      AMAT(IA(ND))=AMAT(IA(ND))-C
+      RHS(ND)=RHS(ND)-C*HB 
+      Q = DRTF(9,L)
+300     CONTINUE        
+C        
 C9-----FILL THE RETURN FLOW TERMS        
         IF (IDRTFL.GT.0) THEN
           INR = DRTF(6,L)
@@ -354,8 +378,7 @@ C------------------------------------------------------------------
             IF (IBOUND(INR) .GT. 0) THEN
               RFPROP = DRTF(9,L)
               H = HNEW(ND)
-              RHS(INR) = RHS(INR)
-     &                           - RFPROP*C*(H-EEL)
+              RHS(INR) = RHS(INR)- Q
             END IF
 C------------------------------------------------------------------            
           ELSEIF(INR.LT.0) THEN  !THIS DRAIN IS SENT TO A SPREADING GROUND  
@@ -369,27 +392,7 @@ C------------------------------------------------------------------
             ENDDO
 C------------------------------------------------------------------        
           ENDIF
-        ENDIF
-        GO TO 100 
-C----------------------------------------------------------------        
-C10-----FOR GHB CONDITIONS WITH Q-RETURN: 
-200     CONTINUE         
-        C = -C
-        HB = EEL
-C
-C6------ADD TERMS TO RHS AND HCOF AT SINK LOCATION.
-      AMAT(IA(ND))=AMAT(IA(ND))-C
-      RHS(ND)=RHS(ND)-C*HB        
-C9-----FILL THE RETURN FLOW TERMS WITH PRESCRIBED Q       
-        IF (IDRTFL.GT.0) THEN
-          INR = DRTF(6,L)
-          IF (INR.GT.0) THEN
-            IF (IBOUND(INR) .GT. 0) THEN
-              Q = DRTF(9,L)
-              RHS(INR) = RHS(INR) - Q
-            END IF
-          ENDIF
-        ENDIF      
+        ENDIF        
 C        
   100 CONTINUE
 C
@@ -479,8 +482,11 @@ C5A-----GET NODE NUMBER OF CELL CONTAINING DRAIN.
           ENDIF
         END IF
 C
-C5B-----IF CELL IS NO-FLOW OR CONSTANT-HEAD, IGNORE IT.
-        IF (IBOUND(ND).LE.0) GOTO 99
+C5B-----IF CELL IS NO-FLOW OR CONSTANT-HEAD, IGNORE IT (ADVANCE IRT).
+        IF (IBOUND(ND).LE.0) THEN
+          IF (IDRTFL.GT.0 .AND. INR.LT.0) IRT = IRT - INR
+          GOTO 99
+        ENDIF
 C
 C5C-----GET DRAIN PARAMETERS FROM DRAIN-RETURN LIST.
         EEL=DRTF(4,L)
@@ -1282,7 +1288,7 @@ C     ------------------------------------------------------------------
       USE GLOBAL,      ONLY:ITRSS,HNEW,HOLD,AREA,IBOUND
       USE GWFDRTMODULE,ONLY: DRTF,MXSPREADNDS,
      1  MXDRT,DRTFLOW,DRTAREA,NDRTCL,NODDRT
-      DOUBLE PRECISION EEL,H,C,DRNOUTFLOW,RFPROP
+      DOUBLE PRECISION EEL,H,C,QRET
 C     ------------------------------------------------------------------
       if(MXSPREADNDS. eq.0) return 
 C1 ----- RESET RETURN FLOW FLUXES IN DRTFLOW
@@ -1291,15 +1297,22 @@ C1 ----- RESET RETURN FLOW FLUXES IN DRTFLOW
         NumRT = DRTF(6,L)
 C2 -------CYCLE IF NOT A SURFACE SPREADING NODE        
         IF (NumRT.GE.0) CYCLE           
-C3 -------CALCULATE FLOW OUT OF DRAIN (WITH H OF PREVIOUS ITERATION)
+C3 -------CALCULATE TOTAL RETURN FLOW FOR THIS DRAIN/GHB
         ND=DRTF(1,L)        
         EL=DRTF(4,L)
         EEL=EL   
         H = HNEW(ND)        
         C=DRTF(5,L) 
-        DRNOUTFLOW = C*(H-EEL)
+        IF (C.LT.0) THEN
+          QRET = DRTF(9,L)
+        ELSE
+          IF (H.LE.EEL) THEN
+            QRET = 0.0
+          ELSE
+            QRET = DRTF(9,L) * C * (H - EEL)
+          ENDIF
+        ENDIF
 C4 -------loop over all surface spreading cells for this drain       
-        RFPROP = DRTF(9,L)
         NumRT = - NumRT 
         DO JJ = 1,NumRT
           IRT = IRT + 1
@@ -1309,7 +1322,7 @@ C5-------IF THE CELL IS EXTERNAL SKIP IT.
           IF (IBOUND(INR) .GT. 0) THEN
 C
 C6 ----------PARTITION SINK ONTO SURFACE SPREADING NODES IN DRTFLOW
-            DRTFLOW(IRT) = RFPROP * DRNOUTFLOW * AREA(INR) / DRTAREA(L) 
+            DRTFLOW(IRT) = QRET * AREA(INR) / DRTAREA(L) 
           END IF
         ENDDO
         ENDDO

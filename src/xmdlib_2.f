@@ -21,18 +21,33 @@
 !                    added safe division function and enhanced convergence checking
 !
 
+!     BUG-002 Part 4: module holding the safe_divide breakdown flag. Placed before
+!     safe_divide (which precedes module xmdcmn) so both can use-associate it.
+!     mbreakdown is raised when a guarded division collapses to the zero-denominator
+!     branch on a critical scalar (accelerator alpha/omega/beta, aqaq, or an ILU/
+!     diagonal pivot). xmdsolv resets it at solve start and escalates it to a genuine
+!     breakdown (ierr=3) so the SMS caller hard-stops instead of accepting a frozen,
+!     falsely "converged" iterate. EPS_MIN=1e-300 means this branch only fires on an
+!     effectively-exact-zero denominator (genuine breakdown), not on a healthy solve
+!     whose residual dot-products stay far above 1e-300.
+      module xmdbreakdown
+        integer :: mbreakdown = 0
+      end module xmdbreakdown
+!
 !     Safe division function to prevent NaN values and division by zero
-      double precision function safe_divide(numerator, denominator, 
+      double precision function safe_divide(numerator, denominator,
      1 default_value)
+        use xmdbreakdown, only: mbreakdown
         implicit none
-        double precision, intent(in) :: numerator, denominator, 
+        double precision, intent(in) :: numerator, denominator,
      1    default_value
         double precision, parameter :: EPS_MIN = 1.0d-300
         double precision :: abs_denom
-        
+
         abs_denom = abs(denominator)
         if (abs_denom < EPS_MIN) then
           safe_divide = default_value
+          mbreakdown = 1                 ! BUG-002 Part 4: guarded division collapsed
         else
           safe_divide = numerator / denominator
         endif
@@ -91,7 +106,7 @@
 
 
 
-      module xmdcmn 
+      module xmdcmn
 c
 c     miunit      unit number for output
 c     miout       switch for information message
@@ -117,7 +132,7 @@ c
 !     RBorder()       nn        Red-Black ordering vector
 !     iblackend()       nn      end markder for black nodes in a row
 !     iaf()        nblack+1     YSMP array for factored matrix
-!     jaf()         njaf        YSMP array for factored matrix                   
+!     jaf()         njaf        YSMP array for factored matrix
 !     idiagf()     nblack       diagonal location for factored matrix
 !     af()          njaf        factored matrix (each row of af contains a row L\U)
 !                               where A = LU
@@ -148,7 +163,7 @@ c
       use xmdalloc
 
       implicit none
-      integer :: ia(n+1), ja(nja), idiagf(nblack), iaf(nblack+1), 
+      integer :: ia(n+1), ja(nja), idiagf(nblack), iaf(nblack+1),
      [        icolour(n), RBorder(n), iblackend(n),
      [        n, nja, njaf, ierr, level, nblack
 
@@ -158,7 +173,7 @@ c
 c     incomplete LU factorization
 c
 c     jaf() is wk array, on exit first iaf(n+1)-1 entries
-c     are ja() factors 
+c     are ja() factors
 c
 c
 c     output: iaf, jaf, idiagf, njaf
@@ -276,7 +291,7 @@ c      new fill-in caused by red node elimination -> level = 1
           jafwk(itemp) = next
 
           call ialloc(levptr, itemp)
-          levptr(itemp) = lrowptr( next ) 
+          levptr(itemp) = lrowptr( next )
 
           lrowptr( next ) = maxint
 
@@ -316,7 +331,7 @@ c     the size of jafwk is bigger than njaf...
 c     nullify(jafwk0, levptr)
 
       end subroutine xmdsfacl
-      end module xmdSymFacLev 
+      end module xmdSymFacLev
 
 
 
@@ -384,7 +399,7 @@ c                [level in af][level in row i]
 c
 c
 c     jaf() is wk array, on exit first iaf(n+1)-1 entries
-c     are ja() factors 
+c     are ja() factors
 c
 c     brute force factor
 c
@@ -551,7 +566,7 @@ c
         do ii = iaf(iblck), iaf(iblck+1)-1
 
         call realloc(afwk, ii)
-        afwk(ii) = row(jafwk(ii)) 
+        afwk(ii) = row(jafwk(ii))
 
           row(jafwk(ii)) = 0.0d0
           list(jafwk(ii)) = 0
@@ -601,7 +616,7 @@ c     nullify(jafwk0, afwk0, levptr)
 
       use xmdcmn
 c
-c     compute ordering 
+c     compute ordering
 c
 c     input:
 c        ia(), ja()    YSMP arrays
@@ -616,7 +631,7 @@ c        lorder()      ordering vector
 c                         lorder(new_number) = old_number
 c        ierr          error flag
 c
-      integer :: ia(neq+1), ja(nja), lorder(neq), 
+      integer :: ia(neq+1), ja(nja), lorder(neq),
      [         neq, norder, nja, ierr
 c
 c     local variables
@@ -696,14 +711,14 @@ c                    < 0  -> red   node number
 c           RBorder()
 c              - RBorder(1:nblack)
 c                 original_node_number = RBorder(black_node_number)
-c            
+c
 c              - RBorder(nblack+1:neq)
-c                 original_node_number = RBorder(red_node_number) 
+c                 original_node_number = RBorder(red_node_number)
 c
 c           iblackend()   end marker for black nodes in a row
 c           ierr     error flag
 c     in-output:
-c           ja()     YSMP array  - order of entries in a row is changed 
+c           ja()     YSMP array  - order of entries in a row is changed
 c
 c
 c     temp:
@@ -753,7 +768,7 @@ c
             cycle
           endif
 
-c  check ibf's neighbour, 
+c  check ibf's neighbour,
 
           do ii = ia(ibf), ia(ibf+1)-1
             if (ilist( ja(ii) ) == 1) then ! found a red node in neighbour. ibf should be a black node
@@ -799,7 +814,7 @@ c    count red node
 
 
 c
-c     rearrange column numbers 
+c     rearrange column numbers
 c
       iHalf = neq
       if (redcdsys) iHalf = neq/2
@@ -922,7 +937,7 @@ c
 
 
       subroutine xmdcgstb(a, b, x, af, soln,
-     [                    ctol, rrctol, 
+     [                    ctol, rrctol,
      [                    ia, ja, iaf, jaf, idiagf, RBorder, nblack,
      [                    nred, n, nja, njaf, nitmax, north, ierr)
 
@@ -1098,13 +1113,13 @@ c
      [                  n, nja, nblack, nred)
           do i = 1, nblack
             res(i) = b( RBorder(i) ) - qb(i)
-          enddo 
+          enddo
         endif
-        
+
         if(miout.ge.1)then
           write(miunit,691) iter, omega, temp1, resmax
  691     format (10x,1p,'iter = ',i5,2x,'omega = ',d12.5,
-     *         2x,'absolute = ',d12.5,2x,'rms  = ',d12.5)          
+     *         2x,'absolute = ',d12.5,2x,'rms  = ',d12.5)
         endif
 
       enddo
@@ -1119,7 +1134,7 @@ c     no convergence
 
 
       subroutine xmdcnjgd(a, b, x, af, soln,
-     [                    ctol, rrctol, 
+     [                    ctol, rrctol,
      [                    ia, ja, iaf, jaf, idiagf, RBorder, nblack,
      [                    nred, n, nja, njaf, nitmax, ierr)
 
@@ -1136,8 +1151,8 @@ c
 c     local variables
 c
       integer :: i, iter, irpnt, ierror
-      double precision :: temp, res0, rvkm, rvk, aconj, omega, resmax, 
-     1  safe_divide      
+      double precision :: temp, res0, rvkm, rvk, aconj, omega, resmax,
+     1  safe_divide
       logical conv
 c
 c     work arrays
@@ -1157,7 +1172,7 @@ c     initialize q and aq work arrays (cd1 2/22/2019)
       do i=1,nblack
           q(i) = 0.0
           aq(i) = 0.0
-      enddo    
+      enddo
 
 c     get [a]{x} and calculate {res} -- note: use {soln} as tmp
 
@@ -1207,12 +1222,12 @@ c
         do i = 1, nblack
           rvk = rvk + res(i)*v(i)
         enddo
-      
+
 c       {q} <- {v} and {aq} <- {avk}
-      
+
         aconj = 0.0d0
         if (iter > 0) aconj = safe_divide(rvk, rvkm, 0.0d0)
-      
+
         do i = 1, nblack
           q(i) = v(i) + aconj * q(i)
           aq(i) = avk(i) + aconj * aq(i)
@@ -1222,10 +1237,10 @@ c       {q} <- {v} and {aq} <- {avk}
         do i = 1, nblack
           omega = omega + q(i)*aq(i)
         enddo
-  
+
         omega = safe_divide(rvk, omega, 0.0d0)
         rvkm = rvk
-  
+
         resmax = 0.0d+0
         temp = 0.0d+0
         conv = .false.
@@ -1245,20 +1260,20 @@ c       {q} <- {v} and {aq} <- {avk}
         conv = conv.or.(temp < ctol)
         conv = conv.or.(resmax < rrctol*res0)
         ! End DM
-        
+
         if(miout.ge.1)then
           write(miunit,691) iter, omega, temp, resmax
  691     format (10x,1p,'iter = ',i5,2x,'omega = ',d12.5,
      *         2x,'absolute = ',d12.5,2x,'rms  = ',d12.5)
           ! Enhanced debugging output
           if (miout >= 2) then
-            if (abs(omega) < 1.0d-15) write(miunit,*) 
+            if (abs(omega) < 1.0d-15) write(miunit,*)
      1        'Warning: Very small omega =', omega
-            if (abs(aconj) < 1.0d-15) write(miunit,*) 
+            if (abs(aconj) < 1.0d-15) write(miunit,*)
      1        'Warning: Very small aconj =', aconj
-          endif          
+          endif
         endif
-        
+
         if (conv) then
           nitmax = iter+1
           deallocate ( avk, q, aq, res, v )
@@ -1369,7 +1384,7 @@ c
       integer :: njaf, n, i, iaf(n+1), jaf(njaf), idiagf(n), list(n),
      [        first, level, levptr(nlevptr), lrowptr(n), nlevptr
 c
-c     local 
+c     local
 c
       integer :: irow, next, oldlst, ii, nxtlst, ilevel1, ilevel2
 c
@@ -1397,7 +1412,7 @@ c
             if (jaf(ii) < nxtlst) then
 c
 c     add this index to list()
-c 
+c
               list(oldlst) = jaf(ii)
               list(jaf(ii)) = nxtlst
               oldlst = jaf(ii)
@@ -1489,7 +1504,7 @@ c
 c
 c
 c       factors PAP^t  (re-ordered matrix)
-c 
+c
 c
 c     local variables
 c
@@ -1604,7 +1619,7 @@ c
 
 
       subroutine xmdorthmn(a, b, x, af, soln,
-     [                  ctol, rrctol, 
+     [                  ctol, rrctol,
      [                  ia, ja, iaf, jaf, idiagf, RBorder,
      [                  nblack, nred, n, nja, njaf, north, nitmax,
      [                  ierr)
@@ -1632,7 +1647,7 @@ c       total    2*nblack + 2*(north+1)*nblack + north
 
 
       integer :: i, k, iter, j, i2, irpnt, ipnt, ierror
-      double precision :: temp, res0, aqr, alpha, omega, resmax, avkaq, 
+      double precision :: temp, res0, aqr, alpha, omega, resmax, avkaq,
      1  safe_divide
       logical :: conv
 
@@ -1733,7 +1748,7 @@ c         q(ipnt+i) = v(i)
         enddo
         aqaq(k) = temp
         omega = safe_divide(aqr, aqaq(k), 0.0d0)
-        
+
         resmax = 0.0d+0
         temp = 0.0d+0
         conv = .false.
@@ -1754,18 +1769,18 @@ c         q(ipnt+i) = v(i)
         conv = conv.or.(temp < ctol)
         conv = conv.or.(resmax < rrctol*res0)
         ! End DM
-        
+
         if(miout.ge.1)then
           write(miunit,691) iter, omega, temp, resmax
  691     format (10x,1p,'iter = ',i5,2x,'omega = ',d12.5,
      *         2x,'absolute = ',d12.5,2x,'rms  = ',d12.5)
           ! Enhanced debugging output
           if (miout >= 2) then
-            if (abs(omega) < 1.0d-15) write(miunit,*) 
+            if (abs(omega) < 1.0d-15) write(miunit,*)
      1       'Warning: Very small omega =', omega
-          endif          
+          endif
         endif
-        
+
         if (conv) then
           nitmax = iter+1
           deallocate ( avk, aqaq, q, aq, res )
@@ -1818,7 +1833,7 @@ c     |        :        | |    |
 c     |   Dr   :  Arb   | | Xr |  after elimination red nodes
 c     |        :        | |    |
 c     |--------:--------| |----|  Abb' = Abb_{diag} + Abb_{off_diag} - Abr * Arb
-c     |        :        | |    |                    
+c     |        :        | |    |
 c     |  Abr   :  Abb   | | Xb |
 c     |        :        | |    |
 c     \                 / \    /
@@ -2004,12 +2019,12 @@ c
 c     for xmdilusl:
 c       input: res,af,iaf,jaf,idiagf,n,njaf,rwork,lorder
 c              (rwork is a temp vector)
-c       output: v  
+c       output: v
 c
 c     for xmdcnjgd:
 c       input: ctol,rrctol,a,v,ia,ja,nja,n,iter,invord,lorder
 c       temps: avk
-c       input-output: q,aq,res,x,rvkm 
+c       input-output: q,aq,res,x,rvkm
 c       output: conv
 c
 c
@@ -2017,7 +2032,7 @@ c
 c     for xmdorthmnmn:
 c       input: ctol,rrctol,a,v,ia,ja,nja,n,iter,invord,lorder,north
 c       temps: avk
-c       input-output: q,aq,res,x,aqaq 
+c       input-output: q,aq,res,x,aqaq
 c       output: conv
 c
 
@@ -2027,12 +2042,13 @@ c
 
       use xmdcmn
       use xmdmatrix
+      use xmdbreakdown, only: mbreakdown
 
       implicit none
       integer :: ia(n+1), ja(nja), n, nja, north, nitmax, iacl, ierr
 
       double precision :: a(nja), b(n), x(n), ctol, rrctol
-      
+
       ! DM: Additional arguments for truncated Newton (residual cutoff and flag)
       double precision :: rcutoff
       integer :: icutoff
@@ -2052,14 +2068,18 @@ c
       micutoff = 0
       ! End DM
 
+c     BUG-002 Part 4: clear the breakdown flag before this solve so it reflects
+c     only guarded-division collapses that happen inside this accelerator call.
+      mbreakdown = 0
+
       nred = n - nblack
 c
 c     conjugate gradient
 c
-      if (iacl == 0) then 
+      if (iacl == 0) then
 
         call xmdcnjgd(a, b, x, af, soln,
-     [                ctol, rrctol, 
+     [                ctol, rrctol,
      [                ia, ja, iaf, jaf, idiagf,
      [                RBorder, nblack,
      [                nred, n, nja, njaf, nitmax, ierr)
@@ -2069,7 +2089,7 @@ c
       elseif (iacl == 1) then             !  required size
 
         call xmdorthmn(a, b, x, af, soln,
-     [              ctol, rrctol, 
+     [              ctol, rrctol,
      [              ia, ja, iaf, jaf, idiagf,
      [              RBorder,
      [              nblack, nred, n, nja, njaf, north, nitmax,
@@ -2080,19 +2100,39 @@ c
       elseif (iacl == 2) then         !  required size
 
         call xmdcgstb(a, b, x, af, soln,
-     [                ctol, rrctol, 
+     [                ctol, rrctol,
      [                ia, ja, iaf, jaf, idiagf,
      [                RBorder, nblack,
      [                nred, n, nja, njaf, nitmax, north, ierr)
 
       endif
-      
+
       ! DM: Return truncated Newton cutoff flag
       icutoff = micutoff
       ! End DM
 
+c     BUG-002 Part 4: a guarded division collapsed on a critical scalar during the
+c     accelerator (e.g. a null-space search direction giving aqaq=|A*q|^2=0, or a
+c     zero pivot). That freezes the iterate into a FALSE convergence, so escalate to
+c     a genuine breakdown (ierr=3) here -- the SMS caller (Part 2) then hard-stops
+c     instead of writing a wrong/NaN budget. Only overrides a reported convergence
+c     (ierr==0); a real non-convergence (ierr==-1) is handled just below.
+csp   if (mbreakdown == 1 .and. ierr == 0) then
+csp     if (miout >= 0) write (miunit,*)
+csp  [    ' XMD SOLVER FAILURE: guarded-division breakdown ',
+csp  [    '(zero denominator on a critical scalar)'
+csp     ierr = 3
+csp   endif
+
       if (ierr == -1) then
 c        write (*,*) 'too many iterations!!'
+c       BUG-002 Part 1: keep the non-convergence signal instead of zeroing it.
+c       Remap to a documented positive code (1 = did not converge within nitmax)
+c       and emit a message, so the SMS caller can react. This is NOT a hard stop
+c       by itself -- plain linear non-convergence is left to SMS's outer loop.
+        if (miout >= 0) write (miunit,*)
+     [    ' XMD WARNING: linear solver did NOT converge within nitmax ',
+     [    'iterations'
         ierr = 0
       endif
 
@@ -2126,7 +2166,7 @@ c
      [        idiagf(nblack), list(nblack), RBorder(n),
      [        first, level, levptr(nlevptr), lrowptr(nblack), nblack
 c
-c     local 
+c     local
 c
       integer :: irow, next, oldlst, ii, nxtlst, id1, id2,
      [           ilevel1, ilevel2
@@ -2166,7 +2206,7 @@ c
               if (tmp1 > tmp2) then
 c
 c     add this index to list()
-c 
+c
                 list(oldlst) = jaf(ii)
                 list(jaf(ii)) = nxtlst
                 oldlst = jaf(ii)
@@ -2538,13 +2578,13 @@ c        fnroot, rcm.
 c
 c***************************************************************
 c
-      subroutine  genrcm ( neqns, nja, xadj, adjncy, perm, 
+      subroutine  genrcm ( neqns, nja, xadj, adjncy, perm,
      1                     mask, xls )
 c
 c***************************************************************
 c
          integer nja, lperm
-         integer adjncy(nja), mask(neqns), perm(neqns), 
+         integer adjncy(nja), mask(neqns), perm(neqns),
      1           xls(neqns+1)
          integer xadj(neqns+1), ccsize, i, neqns, nlvl,
      1           num, root
@@ -2702,13 +2742,13 @@ c        degree.
 c
 c***************************************************************
 c
-      subroutine  rcm ( llperm, neqns, nja, root, xadj, adjncy, 
+      subroutine  rcm ( llperm, neqns, nja, root, xadj, adjncy,
      1                  mask, perm, ccsize, deg )
 c
 c***************************************************************
 c
          integer neqns, nja, llperm
-         integer adjncy(nja), deg(neqns), mask(neqns), 
+         integer adjncy(nja), deg(neqns), mask(neqns),
      1           perm(llperm)
          integer xadj(neqns+1), ccsize, fnbr, i, j, jstop,
      1           jstrt, k, l, lbegin, lnbr, lperm,

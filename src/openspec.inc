@@ -13,7 +13,7 @@ C
 C  ACCESS specifier --
 C
 C    Standard Fortran -- Use unless there is a reason to do otherwise.
-      DATA ACCESS/'SEQUENTIAL'/
+CC      DATA ACCESS/'SEQUENTIAL'/
 C
 C    STREAM is necessary for GFortran and potentially other compilers;
 C    however, STREAM will not completely REPLACE an output file, but
@@ -22,21 +22,21 @@ C    simulation terminates early or produces less output than the
 C    previous simulation, the results of the previous simulation that
 C    have not been overwritten will remain on disk and could be mis-
 C    read or mis-interpreted.
-CC      DATA ACCESS/'STREAM'/
+      DATA ACCESS/'STREAM'/
 C
 C
 C  FORM specifier --
 C
 C    Standard Fortran, which results in vender dependent (non-portable)
 C    files.  Use unless there is a reason to do otherwise.
-CC      DATA FORM/'UNFORMATTED'/
+      DATA FORM/'UNFORMATTED'/
 C
 C    Non-standard Fortran that causes code compiled by Compaq (Digital)
 C    Fortran on personal computers to use unstructured non-formatted
 C    files.  This may make it possible for the non-formatted files used
 C    by MODFLOW to be used with programs that are compiled by other
 C    compilers.
-      DATA FORM/'BINARY'/
+CC      DATA FORM/'BINARY'/
 C
 C
 C  OPEN-statement specifiers related to file-sharing.

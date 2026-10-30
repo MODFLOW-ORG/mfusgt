@@ -25,7 +25,7 @@ jobs:
         include:
           # gcc
           - {os: ubuntu-22.04, compiler: gcc, version: 13, shell: bash, release: no}
-          - {os: macos-14, compiler: gcc, version: 13, shell: bash, release: yes}
+          - {os: macos-15, compiler: gcc, version: 13, shell: bash, release: yes, xcode-version: '16.4'}
           - {os: windows-2022, compiler: gcc, version: 13, shell: pwsh, release: no}
           # intel
           - {os: ubuntu-22.04, compiler: intel-classic, version: 2021.7, shell: bash, release: no}
@@ -45,7 +45,13 @@ jobs:
         with:
           compiler: ${{ matrix.compiler}}
           version: ${{ matrix.version }}
-          
+
+      - name: Set xcode version (macOS)
+        if: runner.os == 'macOS'
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ matrix.xcode-version }}
+
       - name: Setup pixi
         uses: prefix-dev/setup-pixi@v0.11.2
         with:
@@ -91,12 +97,20 @@ jobs:
           pixi run setup builddir-dble -Ddouble=true
           pixi run build builddir-dble
 
+      - name: Test ${{ env.PROGRAM_NAME }}
+        working-directory: ${{ env.PROGRAM_NAME }}
+        run: pixi run test
+
       - name: Check architecture (macOS)
         working-directory: ${{ env.PROGRAM_NAME }}/bin
         if: runner.os == 'macOS'
         run: |
           otool -L mfusgt
           otool -L mfusgtdbl
+          if otool -L mfusgt mfusgtdbl | grep -E 'libgfortran|libgcc_s|libquadmath'; then
+            echo "error: binaries dynamically link gcc/gfortran runtime libraries"
+            exit 1
+          fi
           lipo -info mfusgt
           lipo -info mfusgtdbl
 

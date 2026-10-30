@@ -43,3 +43,7 @@
 .pixi/
 bin/
 builddir*/
+
+# Python
+__pycache__/
+.pytest_cache/

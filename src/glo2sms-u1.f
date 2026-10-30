@@ -2,7 +2,7 @@
 
       USE GLOBAL, ONLY: NODES,IOUT,STRT,IBOUND,AMAT,RHS,HNEW,NJA,NEQS,
      1            NLAY,ILAYCON4,ISYMFLG,INCLN,INGNC,INGNC2,INGNCn,
-     2            NODLAY, BOT, IA, JA, JAS, IVC, ICONCV
+     2            NODLAY, BOT, IA, JA, JAS, IVC, ICONCV, NPER
       USE GWFBCFMODULE, ONLY: LAYCON,IWDFLG
       USE SMSMODULE
 csp      USE GNCMODULE, ONLY:ISYMGNC
@@ -10,6 +10,7 @@ csp      USE GNC2MODULE, ONLY:ISYMGNC2
       USE GNCnMODULE, ONLY:ISYMGNCn
       USE XMDMODULE, ONLY: IACL
       USE PCGUMODULE,ONLY:PCGU7U1AR
+      USE IMS7WRAPPERMODULE, ONLY: IMS7U1AR, IMS7_GET_CONFIG_ACCEL
 
       IMPLICIT NONE
 !     ------------------------------------------------------------------
@@ -25,15 +26,16 @@ csp      USE GNC2MODULE, ONLY:ISYMGNC2
 !     LOCAL VARIABLES
 !     ------------------------------------------------------------------
       INTEGER lloc, istart, istop, i, n, K, IFDPARAM, MXVL, NPP
-      INTEGER IPCGUM 
+      INTEGER IPCGUM
+      INTEGER IMSACC   ! F-3: configured IMS accelerator (1=CG, 2=BiCGSTAB)
       INTEGER :: NSTRT, NNDLAY
       CHARACTER(LEN=200) line
       REAL r, HCLOSEdum, HICLOSEdum,  thetadum, amomentdum,yo
-      REAL akappadum, gammadum, BREDUCDUM,BTOLDUM,RESLIMDUM 
-c      
+      REAL akappadum, gammadum, BREDUCDUM,BTOLDUM,RESLIMDUM
+c
       INTEGER :: J, JCOL, JCOLS
       INTEGER :: I0, I1
-      DOUBLE PRECISION :: BBOT      
+      DOUBLE PRECISION :: BBOT
 !     LOCAL VARIABLES FOR GCG SOLVER
 
 !     ------------------------------------------------------------------
@@ -71,7 +73,7 @@ C
       Breduc = 0.
       RES_LIM = 0.
       IBFLAG = 0
-      isolverfile = 0 
+      isolverfile = 0
 ! Check if default solver values will be used
       lloc = 1
       IFDPARAM = 0
@@ -98,7 +100,7 @@ C
      1 ' INPUT VALUES REFLECT STRONGLY NONLINEAR MODEL')
       ELSE
         BACKSPACE IN
-        WRITE(IOUT,27) 
+        WRITE(IOUT,27)
    27   FORMAT(1X, ' ALL SOLVER INPUT DATA WILL BE READ',
      +                     1X,'FROM THE SOLVER INPUT FILE. ')
       END IF
@@ -119,30 +121,38 @@ C2B----READ OPTIONS
         WRITE(IOUT,31)
    31   FORMAT(1X,'ONLY ACTIVE NODES WILL BE PASSED TO THE SOLVER')
       ELSEIF(LINE(ISTART:ISTOP).EQ.'DAMPBOT') THEN
-        IBOTAV=1  
+        IBOTAV=1
         WRITE(IOUT,32)
-   32   FORMAT(1X,'BOTTOM DAMPING APPLIED TO EACH LINEAR SOLUTION')   
+   32   FORMAT(1X,'BOTTOM DAMPING APPLIED TO EACH LINEAR SOLUTION')
       ELSEIF(LINE(ISTART:ISTOP).EQ.'SHIFT') THEN
-        ISHIFT=1  
+        ISHIFT=1
         WRITE(IOUT,33)
-   33   FORMAT(1X,'SOLUTION VECTOR WILL BE SHIFTED BEFORE AND AFTER', 
-     1    1X,'EACH LINEAR SOLVE')           
+   33   FORMAT(1X,'SOLUTION VECTOR WILL BE SHIFTED BEFORE AND AFTER',
+     1    1X,'EACH LINEAR SOLVE')
       ELSEIF(LINE(ISTART:ISTOP).EQ.'TRUNCATEDNEWTON') THEN
-        ITRUNCNEWTON=1  
+        ITRUNCNEWTON=1
         WRITE(IOUT,34)
-   34   FORMAT(1X,'TRUNCATED NEWTON OPTION WILL BE USED') 
+   34   FORMAT(1X,'TRUNCATED NEWTON OPTION WILL BE USED')
       ELSEIF(LINE(ISTART:ISTOP).EQ.'TRUNCATEDNEWTONCUTOFF') THEN
         ITRUNCNEWTON=1
         CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,YO,IOUT,IN)
-        MaxRcutoff = YO 
+        MaxRcutoff = YO
         WRITE(IOUT,35) YO
    35   FORMAT(1X,'TRUNCATED NEWTON OPTION WILL BE USED WITH MAXCUTOFF'
-     1     1X,'=', E12.5)   
+     1     1X,'=', E12.5)
       ELSEIF(LINE(ISTART:ISTOP).EQ.'SOLVEROUTPUTFILE') THEN
-          CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,isolverfile,R,IOUT,IN) 
+          CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,isolverfile,R,IOUT,IN)
           WRITE(IOUT,36) isolverfile
    36     FORMAT(1X,'SEPARATE SOLVER OUTPUT IS ON UNIT NUMBER'
-     1     1X,'=', I5)     
+     1     1X,'=', I5)
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'STRESSPERIODSETTINGS') THEN
+C-------PROTOTYPE opt-in: read per-stress-period solver settings from MF6-style
+C-------BEGIN/END PERIOD blocks after the standard SMS input (keyword name is
+C-------provisional, to be finalized with the maintainer).
+        ISPS = 1
+        WRITE(IOUT,37)
+   37   FORMAT(1X,'PER-STRESS-PERIOD SOLVER SETTINGS (PERIOD BLOCKS)',
+     1     1X,'WILL BE READ')
       ENDIF
       IF(LLOC.LT.200) GO TO 30
 C
@@ -291,6 +301,18 @@ csp     +                 IFDPARAM, IPCGUM)
         Write(iout,*)
         ISYMFLG = 0
         IF ( IPCGUM.EQ.1 ) ISYMFLG = 1
+      ELSEIF ( Linmeth==5 )Then
+C4d-------for IMS linear solver (ported from MODFLOW 6 tag 6.4.4)
+        Write(iout,*) '***IMS linear solver will be used***'
+        CALL IMS7U1AR(IN, MXITER, ITER1, IPRSMS, IFDPARAM, IOUT)
+        Write(iout,*)
+C4d-------F-3: flag the solver's symmetry from the CONFIGURED accelerator so the
+C4d-------GNCn compatibility check below fires for a symmetric-only (CG) solver,
+C4d-------matching xMD (IACL=0) and PCGU (CG). Query the configured accelerator
+C4d-------(ims_settings), NOT the live solver -- SOLVEACTIVE defers IMS_PREPROC.
+        ISYMFLG = 0
+        CALL IMS7_GET_CONFIG_ACCEL(IMSACC)
+        IF (IMSACC.EQ.1) ISYMFLG = 1   ! CG is symmetric-only
       ELSE
 C4c-----Incorrect linear solver flag
         Write(iout,*) '***Incorrect value for Linear solution method ',
@@ -346,7 +368,7 @@ C
         IF(IWDFLG.NE.0) ISOLVEACTIVE=3
       ENDIF
 C-----IF SOLVEACTIVE=1 SET IA2, JA2 HERE FOR STATIC IBOUND
-      IF(ISOLVEACTIVE.EQ.1) CALL SMS_REDUCE() 
+      IF(ISOLVEACTIVE.EQ.1) CALL SMS_REDUCE()
 C ----------------------------------------------------------------------
 C-------SET BOTMIN FOR NEWTON DAMPENING IF IBOTAV = 1 (do even if not IBOTAV=1)
 c      IF (IBOTAV.EQ.0) THEN
@@ -357,7 +379,7 @@ C---------INITIALIZE CELLBOTM TO BOTTOM OF CELL
         DO N = 1, NODES
           CELLBOTMIN(N) = BOT(N)
         END DO
-C---------USE BOTTOM OF MODEL FOR CONSTANTCV MODELS        
+C---------USE BOTTOM OF MODEL FOR CONSTANTCV MODELS
         IF (ICONCV.NE.0) THEN
           DO K = NLAY, 1, -1
             NNDLAY = NODLAY(K)
@@ -370,7 +392,7 @@ C---------USE BOTTOM OF MODEL FOR CONSTANTCV MODELS
 C---------------PUSH THE VALUE UP TO OVERLYING CELLS IF
 C               BBOT IS LESS THAN THE CELLBOTMIN IN THE
 C               OVERLYING CELL
-              I0 = IA(N) + 1 
+              I0 = IA(N) + 1
               I1 = IA(N+1) - 1
               DO J = I0, I1
                 JCOL = JA(J)
@@ -384,9 +406,218 @@ C               OVERLYING CELL
             END DO
           END DO
         END IF
-c      END IF    
+c      END IF
 C ----------------------------------------------------------------------
+C5B-----Read the per-stress-period PERIOD blocks (all at AR, NPER known).
+C5B-----Only when STRESSPERIODSETTINGS is on; the standard SMS input above
+C5B-----is untouched. MXITERCEIL saves the item-1 MXITER as the Hncg/Lrch
+C5B-----allocation ceiling for the per-SP MXITER clamp. See SMS_PERSP_READ
+C5B-----/ SMS_PERSP_APPLY below.
+      MXITERCEIL = MXITER
+      IF(ISPS.EQ.1) CALL SMS_PERSP_READ(IN,IOUT,NPER)
 C6------Return
+      RETURN
+      END
+C-----------------------------------------------------------------------------
+      SUBROUTINE SMS_PERSP_READ(IN,IOUT,NPER)
+C     ******************************************************************
+C     Read MF6-style per-stress-period solver-setting blocks
+C       BEGIN PERIOD <iper> / <keyword> <value> ... / END PERIOD
+C     from unit IN (all blocks at AR), store into SMSMODULE SPSVAL/SPSSET
+C     sized (NSPSP,NPER), then forward-fill (a block applies from its SP
+C     onward until a later PERIOD block changes it). Recognized keywords:
+C     the outer/nonlinear params (HCLOSE/HICLOSE/MXITER/ITER1/THETA/AKAPPA/
+C     GAMMA/AMOMENTUM/NUMTRACK/BTOL/BREDUC/RESLIM/TRUNCATEDNEWTONCUTOFF)
+C     and the per-solve LINEAR tolerances HICLOSE/RCLOSE/ITER1 (Option A:
+C     tolerances only -- structural params LEVEL/ordering/preconditioner
+C     are intentionally not settable). Unknown keyword is a hard error.
+C     ******************************************************************
+      USE SMSMODULE, ONLY: NSPSP,SPSVAL,SPSSET
+      IMPLICIT NONE
+      INTEGER IN,IOUT,NPER
+      CHARACTER*400 LINE
+      CHARACTER*24 CKW
+      INTEGER LLOC,ISTART,ISTOP,I,IOS,IPER,IP,KP
+      REAL R,RVAL
+      EXTERNAL URWORD, USTOP
+C-----allocate + zero the per-SP override table
+      IF(ALLOCATED(SPSVAL)) DEALLOCATE(SPSVAL)
+      IF(ALLOCATED(SPSSET)) DEALLOCATE(SPSSET)
+      ALLOCATE(SPSVAL(NSPSP,NPER))
+      ALLOCATE(SPSSET(NSPSP,NPER))
+      SPSVAL = 0.0D0
+      SPSSET = 0
+C-----loop over PERIOD blocks until EOF or a non-BEGIN line
+   10 READ(IN,'(A)',IOSTAT=IOS) LINE
+      IF(IOS.NE.0) GO TO 900
+      IF(LEN_TRIM(LINE).EQ.0) GO TO 10                ! blank line
+      LLOC=1
+      CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,I,R,IOUT,IN)
+      IF(LINE(ISTART:ISTART).EQ.'#') GO TO 10         ! comment
+      IF(LINE(ISTART:ISTOP).NE.'BEGIN') GO TO 900     ! not a block -> done
+      CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,I,R,IOUT,IN)   ! 'PERIOD'
+      CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IPER,R,IOUT,IN)
+      IF(IPER.LT.1 .OR. IPER.GT.NPER) THEN
+        WRITE(IOUT,71) IPER,NPER
+   71   FORMAT(1X,'*** SMS STRESSPERIODSETTINGS: PERIOD ',I6,
+     1     1X,'OUT OF RANGE (NPER=',I6,'). STOPPING.')
+        CALL USTOP(' SMS STRESSPERIODSETTINGS: PERIOD OUT OF RANGE')
+      ENDIF
+      WRITE(IOUT,72) IPER
+   72 FORMAT(1X,'SMS PER-SP SETTINGS, BEGIN PERIOD ',I6)
+C-----keyword-value lines until END
+   20 READ(IN,'(A)',IOSTAT=IOS) LINE
+      IF(IOS.NE.0) GO TO 900
+      IF(LEN_TRIM(LINE).EQ.0) GO TO 20                ! blank line
+      LLOC=1
+      CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,I,R,IOUT,IN)
+      IF(LINE(ISTART:ISTART).EQ.'#') GO TO 20         ! comment
+      IF(LINE(ISTART:ISTOP).EQ.'END') GO TO 10        ! end of this block
+      IP=0
+      IF(LINE(ISTART:ISTOP).EQ.'HCLOSE') THEN
+        IP=1
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'HICLOSE') THEN
+        IP=2
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'MXITER') THEN
+        IP=3
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'ITER1') THEN
+        IP=4
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'THETA') THEN
+        IP=5
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'AKAPPA') THEN
+        IP=6
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'GAMMA') THEN
+        IP=7
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'AMOMENTUM') THEN
+        IP=8
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'NUMTRACK') THEN
+        IP=9
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'BTOL') THEN
+        IP=10
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'BREDUC') THEN
+        IP=11
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'RESLIM') THEN
+        IP=12
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'TRUNCATEDNEWTONCUTOFF') THEN
+        IP=13
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'RCLOSE') THEN
+        IP=14
+      ELSE
+        WRITE(IOUT,73) LINE(ISTART:ISTOP)
+   73   FORMAT(1X,'*** SMS STRESSPERIODSETTINGS: UNKNOWN KEYWORD ',A,
+     1     '. STOPPING.')
+        CALL USTOP(' SMS STRESSPERIODSETTINGS: UNKNOWN KEYWORD')
+      ENDIF
+      CKW=LINE(ISTART:ISTOP)
+      CALL URWORD(LINE,LLOC,ISTART,ISTOP,3,I,RVAL,IOUT,IN)
+      SPSVAL(IP,IPER)=RVAL
+      SPSSET(IP,IPER)=1
+      WRITE(IOUT,74) CKW, RVAL
+   74 FORMAT(4X,'SMS PER-SP SETTING ',A24,' = ',G15.6)
+      GO TO 20
+C-----forward-fill: from each set SP onward until changed
+  900 CONTINUE
+      IF(ALLOCATED(SPSSET)) THEN
+        DO 950 IP=1,NSPSP
+        DO 950 KP=2,NPER
+          IF(SPSSET(IP,KP).EQ.0 .AND. SPSSET(IP,KP-1).EQ.1) THEN
+            SPSVAL(IP,KP)=SPSVAL(IP,KP-1)
+            SPSSET(IP,KP)=1
+          ENDIF
+  950   CONTINUE
+      ENDIF
+      RETURN
+      END
+C-----------------------------------------------------------------------------
+      SUBROUTINE SMS_PERSP_APPLY(KPER)
+C     ******************************************************************
+C     Apply the stored per-stress-period solver overrides for KPER.
+C     Outer/nonlinear params overwrite the SMSMODULE vars (read live by
+C     the outer loop). The per-solve LINEAR tolerances -- HICLOSE (inner
+C     head closure), RCLOSE (inner residual), ITER1 (inner cap) -- are
+C     PROPAGATED into the ACTIVE solver (chi-MD / PCGU / IMS) so they take
+C     effect this stress period; structural linear params (LEVEL/ordering/
+C     preconditioner) are left alone. A per-SP MXITER is clamped to the
+C     item-1 allocation ceiling (MXITERCEIL) with a listing warning.
+C     Called AFTER the OC per-SP apply (so SMS overrides OC) and BEFORE the
+C     DO KITER=1,MXITER loop. Inert unless STRESSPERIODSETTINGS is on.
+C     ******************************************************************
+      USE SMSMODULE, ONLY: ISPS,SPSVAL,SPSSET,HCLOSE,HICLOSE,MXITER,
+     1  ITER1,THETA,AKAPPA,GAMMA,AMOMENTUM,NUMTRACK,BTOL,BREDUC,
+     2  RES_LIM,MaxRcutoff,ITRUNCNEWTON,MXITERCEIL,LINMETH
+      USE GLOBAL, ONLY: IOUT
+      USE XMDMODULE, ONLY: RRCTOL
+      USE PCGUMODULE, ONLY: PCGU7_SET_TOLS
+      USE IMS7WRAPPERMODULE, ONLY: IMS7_SET_TOLS
+      IMPLICIT NONE
+      INTEGER KPER, MXREQ, ITR1
+      DOUBLE PRECISION HICL, RCL
+      IF(ISPS.EQ.0) RETURN
+      IF(.NOT.ALLOCATED(SPSSET)) RETURN
+      IF(KPER.LT.1 .OR. KPER.GT.SIZE(SPSSET,2)) RETURN
+C-----outer / nonlinear params (overwrite SMSMODULE vars; read live)
+      IF(SPSSET(1,KPER).EQ.1) HCLOSE   = SPSVAL(1,KPER)
+      IF(SPSSET(2,KPER).EQ.1) HICLOSE  = SPSVAL(2,KPER)
+C-----MXITER: clamp to the item-1 allocation ceiling (Hncg/Lrch sizing)
+      IF(SPSSET(3,KPER).EQ.1) THEN
+        MXREQ = NINT(SPSVAL(3,KPER))
+        IF(MXITERCEIL.GT.0 .AND. MXREQ.GT.MXITERCEIL) THEN
+          WRITE(IOUT,81) MXREQ, KPER, MXITERCEIL
+   81     FORMAT(1X,'*** SMS PER-SP MXITER ',I6,' AT STRESS PERIOD ',I6,
+     1      ' EXCEEDS THE ITEM-1 CEILING ',I6,'; CLAMPED.')
+          MXITER = MXITERCEIL
+        ELSE
+          MXITER = MXREQ
+        ENDIF
+      ENDIF
+      IF(SPSSET(4,KPER).EQ.1) ITER1    = NINT(SPSVAL(4,KPER))
+      IF(SPSSET(5,KPER).EQ.1) THETA    = SPSVAL(5,KPER)
+      IF(SPSSET(6,KPER).EQ.1) AKAPPA   = SPSVAL(6,KPER)
+      IF(SPSSET(7,KPER).EQ.1) GAMMA    = SPSVAL(7,KPER)
+      IF(SPSSET(8,KPER).EQ.1) AMOMENTUM= SPSVAL(8,KPER)
+      IF(SPSSET(9,KPER).EQ.1) NUMTRACK = NINT(SPSVAL(9,KPER))
+      IF(SPSSET(10,KPER).EQ.1) BTOL    = SPSVAL(10,KPER)
+      IF(SPSSET(11,KPER).EQ.1) BREDUC  = SPSVAL(11,KPER)
+      IF(SPSSET(12,KPER).EQ.1) RES_LIM = SPSVAL(12,KPER)
+      IF(SPSSET(13,KPER).EQ.1) THEN
+        IF(SPSVAL(13,KPER).GT.0.0D0) THEN
+          ITRUNCNEWTON = 1
+          MaxRcutoff   = SPSVAL(13,KPER)
+        ELSE
+          ITRUNCNEWTON = 0
+        ENDIF
+      ENDIF
+C-----per-solve LINEAR tolerances -> propagate to the ACTIVE solver.
+C     Sentinel < 0 (ITER1 <= 0) means "leave the solver's value". Only a
+C     keyword actually set for this SP is pushed; structural params (LEVEL/
+C     ordering/preconditioner) are never touched.
+      HICL = -1.0D0
+      RCL  = -1.0D0
+      ITR1 = -1
+      IF(SPSSET(2,KPER).EQ.1)  HICL = SPSVAL(2,KPER)
+      IF(SPSSET(14,KPER).EQ.1) RCL  = SPSVAL(14,KPER)
+      IF(SPSSET(4,KPER).EQ.1)  ITR1 = NINT(SPSVAL(4,KPER))
+      IF(LINMETH.EQ.1) THEN
+C       chi-MD: HICLOSE flows via the STOL arg (=SMSMODULE HICLOSE) and
+C       ITER1 via iter=iter1 (SMSMODULE); only the residual tol needs a
+C       direct push into XMDMODULE.
+        IF(SPSSET(14,KPER).EQ.1 .AND. ASSOCIATED(RRCTOL))
+     1    RRCTOL = SPSVAL(14,KPER)
+      ELSEIF(LINMETH.EQ.2) THEN
+        CALL PCGU7_SET_TOLS(HICL, RCL, ITR1)
+      ELSEIF(LINMETH.EQ.5) THEN
+        CALL IMS7_SET_TOLS(HICL, RCL, ITR1)
+      ENDIF
+C-----echo one summary line when anything was applied this SP
+      IF(SPSSET(2,KPER).EQ.1 .OR. SPSSET(3,KPER).EQ.1 .OR.
+     1   SPSSET(4,KPER).EQ.1 .OR. SPSSET(5,KPER).EQ.1 .OR.
+     2   SPSSET(14,KPER).EQ.1) THEN
+        WRITE(IOUT,80) KPER,THETA,NUMTRACK,MXITER,MaxRcutoff,
+     1                 ITRUNCNEWTON
+   80   FORMAT(1X,'SMS PER-SP SETTINGS APPLIED, STRESS PERIOD ',I6,':',
+     1    1X,'THETA=',G12.5,' NUMTRACK=',I6,' MXITER=',I6,
+     2    1X,'MAXRCUTOFF=',G12.5,' ITRUNCNEWTON=',I2)
+      ENDIF
       RETURN
       END
 C-----------------------------------------------------------------------------
@@ -423,7 +654,7 @@ C2------PERFORM RESIDUAL REDUCTION CYCLES IF REQUIRED
 C2A-------WRITE HEADER FOR SOLVER OUTPUT SUMMARY WITH BACKTRACKING
           WRITE(IOUT,11)
           if(isolverfile. gt. 0) write(isolverfile,5) kstp, kper
-5         format(/5x,'SOLVER OUTPUT FOR TIME STEP ',I7,3X, 
+5         format(/5x,'SOLVER OUTPUT FOR TIME STEP ',I7,3X,
      1      'AND STRESS PERIOD ',I7)
           if(isolverfile. gt. 0) WRITE(isolverfile,11)
 11        FORMAT(' Outer-Iteration  Inner-Iteration  Backtracking  ',
@@ -448,7 +679,7 @@ C
           IF(IWADICLN.NE.0) DEALLOCATE (HWADICC, HWADICG)
           IF(IDPF.NE.0) THEN
             IF(ALLOCATED(AKRCIM)) DEALLOCATE (AKRCIM)
-          ENDIF  
+          ENDIF
           RETURN
         ENDIF
       ELSE
@@ -524,8 +755,8 @@ C2H-------DEALLOCATE ARRAYS
         DEALLOCATE(HWADI, DWADI)
         IF(NOVFC.NE.1) DEALLOCATE (DWADIGW)
         IF(IWADICLN.NE.0) DEALLOCATE (DWADICC, DWADICG)
-      ELSE 
-C2I--------SAVE AMAT FOR USE IN MASS BALANCE CALCULATION          
+      ELSE
+C2I--------SAVE AMAT FOR USE IN MASS BALANCE CALCULATION
         DO J=1,NJA
           AMATFL(J) = AMAT(J)
         ENDDO
@@ -649,7 +880,7 @@ C
 23        format(I9,I17,10X,G16.5,9X,I9,11x,'GWF-node number')
         ENDIF
       ENDIF
-C6------CHECK OUTER ITERATION CONVERGENCE FOR CLN-CELLS 
+C6------CHECK OUTER ITERATION CONVERGENCE FOR CLN-CELLS
       IF(INCLN.EQ.0) GO TO 204
       NB=1
       ICNVGL=0
@@ -737,6 +968,7 @@ C******************************************************************
 C PREPARE FOR SPARSE SOLVER, AND CHECK CONVERGENCE OF NONLINEARITIES
 C******************************************************************
       USE PCGUMODULE,ONLY:PCGU7U1AP
+      USE IMS7WRAPPERMODULE,ONLY:IMS7U1AP
       USE SMSMODULE
       USE XMDMODULE
       USE GLOBAL, ONLY: NCOL,NROW,IUNSTR,IA,JA,NSTP,NLAY,
@@ -767,7 +999,7 @@ c66      FORMAT(I9,1X,G15.6,2X,100G15.6)
         stop
       endif
 C---------------------------------------------------------------------
-C--------SCALE SOLUTION VECTOR IF FLAG IS ON      
+C--------SCALE SOLUTION VECTOR IF FLAG IS ON
       IF(ISHIFT.EQ.1) CALL SHIFTVECTOR(AMAT,SOLN,RHS,SOLNOLD)
 C--------SET MATRIX FOR ACTIVE NODES ONLY - IF FLAG IS ON
       IF(ISOLVEACTIVE.GE.1) CALL COMPRESSMATRIX(AMAT,SOLN,RHS)
@@ -781,10 +1013,10 @@ c           Initialize timeer for preconditioner
             CALL DATE_AND_TIME(VALUES=Itimstart)
           endif
 C
-C2A---------CALL XMD SOLVER
+C2A---------CALL XMD SOLVER initialize IERR
+          ierr = 0
           IF(ILUFLAG.EQ.0) GO TO 300 ! SKIP FACTORIZATION IF ONLY RHS IS UPDATED
 C2A1-------- ILU FACTORIZATION
-          ierr = 0
           IF(IDROPTOL.EQ.0. OR. ILUREUSE)THEN
 C2A2--------numerical factorization only for level based scheme
             call xmdnfctr(amat, rhs, ia2, ja2, nja2, neqs2, ierr)
@@ -794,6 +1026,19 @@ C2A3--------level/drop tolerance preconditioning
      1            level,ierr)
             ILUREUSE = .TRUE.
           ENDIF
+C2A3b------BUG-002 Part 2: check the XMD factorization status. A genuine breakdown
+C2A3b------(ordering/factorization, IERR>1) makes the solution meaningless, so halt
+C2A3b------with a clear message -- the PCGU analogue (pcgu7.f USTOP). Plain solver
+C2A3b------non-convergence (IERR=1) is NOT stopped here; it is left to SMS's outer
+C2A3b------loop. Inert on a healthy factorization (IERR=0).
+csp       IF (IERR.GT.1) THEN
+csp         WRITE(IOUT,901) IERR, KPER, KSTP, KITER
+  901       FORMAT(/1X,'*** XMD SOLVER FAILURE (FACTORIZATION) ***',
+     1        /1X,'IERR = ',I3,'  STRESS PERIOD ',I6,
+     2        '  TIME STEP ',I6,'  OUTER ITER ',I6,
+     3        /1X,'RESULTS ARE NOT VALID. STOPPING EXECUTION.')
+csp         CALL USTOP('XMD SOLVER FAILURE (FACTORIZATION)')
+csp       ENDIF
 300       CONTINUE
           if(iprsms.eq.2)then
 c           time peconditioner
@@ -808,6 +1053,33 @@ C2A4---------solve matrix
           call xmdsolv(amat, rhs, soln, stol, rrctol, ia2, ja2, nja2,
      [             neqs2,north,iter, iacl, ierr, Rcutoff, ICUTOFF)
           IN_ITER = ITER
+C2A4b------BUG-002 Part 2: check the XMD solve status. IERR>1 is a genuine
+C2A4b------breakdown (here IERR=3 = guarded-division collapse escalated by xmdsolv,
+C2A4b------i.e. a frozen/false-converged iterate) -> hard stop, mirroring PCGU.
+C2A4b------IERR=1 (did-not-converge-in-nitmax) is intentionally NOT stopped here;
+C2A4b------it is surfaced and left to SMS's outer loop. Inert on a healthy solve.
+csp       IF (IERR.GT.1) THEN
+csp         WRITE(IOUT,902) IERR, KPER, KSTP, KITER
+  902       FORMAT(/1X,'*** XMD SOLVER FAILURE (SOLVE) ***',
+     1        /1X,'IERR = ',I3,'  STRESS PERIOD ',I6,
+     2        '  TIME STEP ',I6,'  OUTER ITER ',I6,
+     3        /1X,'RESULTS ARE NOT VALID. STOPPING EXECUTION.')
+csp        CALL USTOP('XMD SOLVER FAILURE (SOLVE)')
+csp       ENDIF
+C2A4c------BUG-002 Part 3: NaN/Inf guard on the returned solution. Portable
+C2A4c------not-finite test (.NOT.(ABS(x).LE.HUGE(x)) catches NaN and +/-Inf), so a
+C2A4c------non-finite solve halts here before a NaN budget is written -- the same
+C2A4c------guard the IMS port uses. Inert on a finite solution.
+          DO N = 1, NEQS2
+            IF (.NOT.(ABS(SOLN(N)).LE.HUGE(SOLN(N)))) THEN
+              WRITE(IOUT,903) N, KPER, KSTP, KITER
+  903         FORMAT(/1X,'*** NON-FINITE (NaN/Inf) XMD SOLUTION ***',
+     1          /1X,'NODE ',I10,'  STRESS PERIOD ',I6,
+     2          '  TIME STEP ',I6,'  OUTER ITER ',I6,
+     3          /1X,'RESULTS ARE NOT VALID. STOPPING EXECUTION.')
+              CALL USTOP('NON-FINITE (NaN/Inf) XMD SOLUTION')
+            ENDIF
+          ENDDO
           if(iprsms.eq.2)then
 c           time accelerator
             write(iout,*) 'timing accelerator'
@@ -829,12 +1101,27 @@ C
 c          CALL PPCGU1AP(AMAT, RHS, SOLN, IA2, JA2,
 c     &               ICNVG,KSTP,KPER,MXITER,KITER,IN_ITER,IOUT,
 c     &               Rcutoff,ICUTOFF)
+        ELSEIF(LINMETH.EQ.5)THEN
+C2C-------CALL IMS LINEAR SOLVER (ported from MODFLOW 6 tag 6.4.4)
+C2C-------NOTE: use local IMSIERR, NOT IERR -- the bare name IERR binds to
+C2C-------XMDMODULE's module pointer (USE XMDMODULE) which is unassociated
+C2C-------unless LINMETH=1, so writing to it would dereference null.
+          ICUTOFF = 0
+          IMSIERR = 0
+          CALL IMS7U1AP(AMAT, RHS, SOLN, IA2, JA2, NJA2, NEQS2,
+     &                  ICNVG, KSTP, KPER, MXITER, KITER, IN_ITER,
+     &                  IOUT, Rcutoff, ICUTOFF, IMSIERR)
+          IF (IMSIERR.NE.0) THEN
+            WRITE(IOUT,*) ' IMS SOLVER FAILURE, IMSIERR=', IMSIERR,
+     &        ' KPER=', KPER, ' KSTP=', KSTP, ' KITER=', KITER
+            CALL USTOP('IMS SOLVER FAILURE')
+          ENDIF
         ENDIF
 C
 C---------------------------------------------------------------------
 C-----RESET MATRIX - IF FLAG IS ON
       IF(ISOLVEACTIVE.GE.1) CALL EXPANDMATRIX(AMAT,SOLN,RHS,VNOFLO)
-C--------INVERSE SCALE BACK THE SOLUTION VECTOR IF FLAG IS ON      
+C--------INVERSE SCALE BACK THE SOLUTION VECTOR IF FLAG IS ON
       IF(ISHIFT.EQ.1) CALL INVSHIFTVECTOR(SOLN,SOLNOLD)
 C ----------------------------------------------------------------------
 C3------PRINT SOLUTION FOR CHECKING
@@ -915,7 +1202,7 @@ C     ******************************************************************
 !     SPECIFICATIONS:
 !     -----------------------------------------------------------------
       USE GLOBAL, ONLY:Ibound, Hnew, bot, Iout, Nodes,ICONCV,
-     1  NLAY,NODLAY,NEQS,INCLN,iunsat,INDDF,iunit 
+     1  NLAY,NODLAY,NEQS,INCLN,iunsat,INDDF,iunit
       USE CLN1MODULE, ONLY: ACLNNDS,NCLNNDS,iflincln
       USE GWFBCFMODULE, ONLY: LAYCON
       USE GWFWELMODULE, ONLY: IWELQV
@@ -988,7 +1275,7 @@ C7----------ACCOUNT FOR ICONCV=0 CONDITION FOR LAYCON=4 CASE
               ENDDO
 11            CONTINUE
               IF (LAYCON(KK).EQ.4 ) THEN
-                IF(ICONCV.EQ.0.OR.IBOTAV.EQ.1) THEN  
+                IF(ICONCV.EQ.0.OR.IBOTAV.EQ.1) THEN
                   IF(ICONCV.EQ.0) felev = bot(n)
                   IF(IBOTAV.EQ.1) FELEV = CELLBOTMIN(N)
 C                 IF(INDDF.GT.0) FELEV = FELEV - 0.5e5
@@ -997,7 +1284,7 @@ C                 IF(INDDF.GT.0) FELEV = FELEV - 0.5e5
                     Hnew(N) = HTEMP(N)*(1.0-closebot) + felev*closebot
                     DELH = Hnew(N) - hsave
                   END IF
-                ENDIF  
+                ENDIF
               ENDIF
             ENDIF
 cc---need below to be outside of the ICONCV if-check (or not at all).
@@ -1005,9 +1292,9 @@ cc---need below to be outside of the ICONCV if-check (or not at all).
               NC = N - NODES
               iflin = iflincln(nc)
               if(iflin.gt.0)cycle ! head can go below if iflin.gt.0 (confined case)
-              IF(iunit(2).ne.0) then 
+              IF(iunit(2).ne.0) then
                 if(IWELQV.EQ.0)CYCLE ! HEAD CANT GO BELOW IF AUTOFLOWREDUCE IS Off
-              endif    
+              endif
               FELEV = ACLNNDS(nc,5)
 C              IF(INDDF.GT.0) FELEV = FELEV - 0.5e5
               IF ( Hnew(N).LT.FELEV ) THEN
@@ -1053,29 +1340,29 @@ C11---------COMPUTE NEW HEAD AFTER UNDER-RELAXATION
           ENDDO
         ENDIF
 C12-------ACCOUNT FOR ICONCV=0 CONDITION APPROPRIATELY
-        DO N = 1, NODES 
+        DO N = 1, NODES
           IF (IUNSAT.EQ.0) THEN
             DO K=1,NLAY
               NNDLAY = NODLAY(K)
-              NSTRT = NODLAY(K-1)+1 
+              NSTRT = NODLAY(K-1)+1
               IF(N.GE.NSTRT.AND.N.LE.NNDLAY)THEN
                 KK = K
                 GO TO 12
               ENDIF
             ENDDO
 12          CONTINUE
-            IF ( LAYCON(K).EQ.4 ) THEN 
-              IF(ICONCV.EQ.0.OR.IBOTAV.EQ.1) THEN 
+            IF ( LAYCON(K).EQ.4 ) THEN
+              IF(ICONCV.EQ.0.OR.IBOTAV.EQ.1) THEN
 c                IF(ICONCV.EQ.0)felev = bot(n)
 c                IF(IBOTAV.EQ.1) FELEV = CELLBOTMIN(N)
                 FELEV = CELLBOTMIN(N)   ! JUST USE BOTTOM ELEVATION OF DOMAIN for both cases
                 IF ( Hnew(N).LT.FELEV ) THEN
-                  Hnew(N) = HTEMP(N)*(1.0-closebot) + FELEV*closebot 
+                  Hnew(N) = HTEMP(N)*(1.0-closebot) + FELEV*closebot
                 END IF
               ENDIF
             ENDIF
           ENDIF
-        ENDDO  
+        ENDDO
 cc---need below to be outside of the ICONCV if-check (or not at all).
 C---------FOR CLN CELLS
       IF(INCLN.EQ.0) GO TO 201
@@ -1083,7 +1370,7 @@ C---------FOR CLN CELLS
           FELEV = ACLNNDS(n,5)
           iflin = iflincln(n)
           if(iflin.gt.0)cycle ! head cannot go below if iflin.le.0
-          IF(iunit(2).ne.0) then 
+          IF(iunit(2).ne.0) then
             if(IWELQV.EQ.0)CYCLE ! HEAD CANNOT GO BELOW IF AUTOFLOWREDUCE IS ON
           endif
           IF ( Hnew(N+nodes).LT.FELEV ) THEN
@@ -1361,15 +1648,17 @@ C3C---------FILL DKDHC FOR HORIZONTAL CLN CELL (USE UPSTREAM WETTED PERIMETER)
                 DKDHC(IIS) = AKRC(IIS)
                 HD=HNEW(IUPS)+ EPSILON
                 ICLN = NH-NODES
-                IC = ACLNNDS(ICLN,2)
-      IF(IC.LE.NCONDUITYP)THEN
-C1-------CLN NODE IS A CONDUIT
-                PERIF = ACLNCOND(IC,5)
-      ELSEIF(IC.GT.NCONDUITYP.AND.IC.LE.NCONDUITYP+NRECTYP)THEN
-                PERIF = ACLNREC(IC,6)
-      ELSEIF(IC.GT.NCONDUITYP+NRECTYP)then
-C2------ADD COMPUTATION FOR AREA FOR OTHER CLN TYPES HERE
-CADD      ADD COMPUTATION FOR AREA FOR OTHER TYPES OF CLNs HERE
+                ISHAPE = ACLNNDS(ICLN,7)
+                IFTYPE = ACLNNDS(ICLN,2)
+      IF(ISHAPE.EQ.1)THEN
+C1-------CLN NODE IS A CIRCULAR CONDUIT
+                PERIF = ACLNCOND(IFTYPE,5)
+      ELSEIF(ISHAPE.EQ.2)THEN
+C2-------CLN NODE IS A RECTANGULAR SECTION
+                PERIF = ACLNREC(IFTYPE,6)
+      ELSE
+C3------ADD COMPUTATION FOR PERIMETER FOR OTHER CLN TYPES HERE
+CADD      ADD COMPUTATION FOR PERIMETER FOR OTHER TYPES OF CLNs HERE
       ENDIF
                 IGWCLN = 1
                 CALL CLNPW (ICLN,HD,PERIW,IGWCLN)
@@ -1396,12 +1685,12 @@ C3D---------FILL DKDHC FOR VERTICAL CLN CELL (USE UPSTREAM SATURATIONS)
                 TTOP=TOP(NL)
                 TOTTHICK = TTOP - BBOT
                 K = 0
-C4E-------------GET LAYER NUMBER FOR GW NODE                
+C4E-------------GET LAYER NUMBER FOR GW NODE
                 DO KK = 1,NLAY
                   IF(N. LE. NODLAY(KK)) GO TO 66
-                ENDDO    
-66              CONTINUE 
-C---------------------------------------------------------------                
+                ENDDO
+66              CONTINUE
+C---------------------------------------------------------------
                 CALL SAT_THIK(N,HD,TOTTHICK,BBOT,THCK,KK,TTOP)
               ENDIF
               DKDHC(IIS) = (THCK - DKDHC(IIS))/(EPSILON)
@@ -1944,7 +2233,7 @@ C5------RESET COUNT AND FLAG IF DESIRED RESIDUAL REDUCTION DID OCCUR
           ! End DM
         WRITE(IOUT,66) KITER,IBFLAG,IBCOUNT,RESIN,RES_NEW,Rcutoff
         if(isolverfile. gt. 0) WRITE(isolverfile,66) KITER,IBFLAG,
-     1   IBCOUNT,RESIN,RES_NEW,Rcutoff        
+     1   IBCOUNT,RESIN,RES_NEW,Rcutoff
         IBFLAG = 0
         IBCOUNT = 0
         RES_PREV = RES_NEW
@@ -2004,7 +2293,7 @@ C2----------COMPUTE MEAN SQUARE RESIDUAL FROM Q OF EACH NODE
           RESIDUAL = RESIDUAL +  (ROWSUM - RHS(N))**2
         ENDIF
       ENDDO
-      RES = RESIDUAL      
+      RES = RESIDUAL
 C3------RETURN
       RETURN
       END SUBROUTINE RES_FUNC
@@ -2013,6 +2302,7 @@ C-----------------------------------------------------------------------
       SUBROUTINE GWF2SMS7U1DA
       USE SMSMODULE
       USE PCGUMODULE,ONLY:PCGU7U1DA
+      USE IMS7WRAPPERMODULE,ONLY:IMS7DA
 C
       DEALLOCATE(HTEMP)
       DEALLOCATE (Hncg,Lrch)
@@ -2029,6 +2319,8 @@ C
         CALL PCGU7U1DA
       ELSEIF(LINMETH.EQ.4) THEN
 csp        CALL PPCGU1DA
+      ELSEIF(LINMETH.EQ.5) THEN
+        CALL IMS7DA
       ENDIF
       DEALLOCATE (ITER1,MXITER,LINMETH,NONMETH,IPRSMS)
       DEALLOCATE(RES_LIM,IBFLAG)
@@ -2109,6 +2401,7 @@ C     ******************************************************************
       USE SMSMODULE,ONLY:LINMETH
       USE XMDMODULE,ONLY:REDSYS,IDROPTOL,level,DGSCAL,NORDER,ILUREUSE
       USE PCGUMODULE,ONLY:PCGUSETDIMS
+      USE IMS7WRAPPERMODULE,ONLY:IMS_PREPROC
 C
 C-----SET IA2,JA2,NEQS2,NJA2,IA1IA2,JA1JA2
       CALL FILLIA2JA2(IA,JA,NEQS,NJA,IA2,JA2,NEQS2,NJA2,IA1IA2,
@@ -2119,6 +2412,8 @@ C-----CALL SOLVER SUBROUTINES TO RESET INTERNAL ARRAYS
           CALL XMD_PREPROC()
         ELSEIF(LINMETH.EQ.2)THEN
           CALL PCGUSETDIMS(NEQS2,NJA2)
+        ELSEIF(LINMETH.EQ.5)THEN
+          CALL IMS_PREPROC()
         ENDIF
 C-----RETURN
       RETURN
@@ -2235,44 +2530,44 @@ C     TRANSLATE RHS VECTOR BEFORE CALLING SOLVER (RHS = RHS - A * SOLNOLD*factpr
 C     ******************************************************************
       USE GLOBAL,   ONLY:IA,JA,NEQS,NJA,IBOUND
       use SMSMODULE, only: scalfact
-      DOUBLE PRECISION AMAT(NJA),SOLN(NEQS),RHS(NEQS),SOLNOLD(NEQS) 
+      DOUBLE PRECISION AMAT(NJA),SOLN(NEQS),RHS(NEQS),SOLNOLD(NEQS)
 C
 C-----DEFINE SCALING FACTOR TO USE (1 MEANS SOLVING FOR DELH)
       SCALFACT = 0.01
-C      
+C
 C-----LOOP OVER ALL ROWS MATRIX
       DO N=1,NEQS
         IF(IBOUND(N).EQ.0) CYCLE
         DO J = IA(N),IA(N+1)-1
           JJ = JA(J)
-C---------ADJUST RHS FOR EACH ROW BY SOLNOLD          
+C---------ADJUST RHS FOR EACH ROW BY SOLNOLD
           RHS(N) = RHS(N) - AMAT(J) * SOLNOLD(JJ) * SCALFACT
         ENDDO
       ENDDO
 C
 C-----RETURN
       RETURN
-      END 
+      END
 C
       SUBROUTINE INVSHIFTVECTOR(SOLN,SOLNOLD)
 C     ******************************************************************
 C     TRANSLATE SOLUTION VECTOR BACK AFTER CALLING SOLVER (SOLN = SOLN + SOLNOLD*factor)
 C     ******************************************************************
-      USE GLOBAL,   ONLY:IA,JA,NEQS,NJA,IBOUND 
-      use SMSMODULE, only: scalfact      
-      DOUBLE PRECISION SOLN(NEQS), SOLNOLD(NEQS) 
+      USE GLOBAL,   ONLY:IA,JA,NEQS,NJA,IBOUND
+      use SMSMODULE, only: scalfact
+      DOUBLE PRECISION SOLN(NEQS), SOLNOLD(NEQS)
 C
 C-----LOOP OVER ALL ROWS MATRIX
       DO N=1,NEQS
-        IF(IBOUND(N).EQ.0) CYCLE      
-C---------ADJUST SOLN FOR EACH ROW BY SOLNOLD          
+        IF(IBOUND(N).EQ.0) CYCLE
+C---------ADJUST SOLN FOR EACH ROW BY SOLNOLD
           SOLN(N) = SOLN(N) + SOLNOLD(N) * SCALFACT
       ENDDO
 C
 C-----RETURN
       RETURN
-      END 
-C      
+      END
+C
       SUBROUTINE TIMING(IOUT,IBDT,IPRTIM)
 C     ******************************************************************
 C     Get entry time and timing for a routine (preconditioning or acceleration)
@@ -2353,7 +2648,7 @@ C
  1030     FORMAT(1X,'Elapsed time in routine: ',I2,' Minutes, ',
      &      I2,'.',I3.3,' Seconds',/)
  1040     FORMAT(1X,'Elapsed time in routine: ',I2,'.',I3.3,
-     &  ' Seconds',/) 
+     &  ' Seconds',/)
 C
 C     Write times to file if requested
       IF(IPRTIM.GT.0) THEN
@@ -2370,4 +2665,4 @@ C     Write times to file if requested
 C
       RETURN
       END
-      
+

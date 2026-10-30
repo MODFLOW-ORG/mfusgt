@@ -2,10 +2,12 @@ C ------------------------------------------------------------------------------
       MODULE DDFMODULE
 C
         INTEGER, SAVE, POINTER :: IDDF, ITHICKAV, IMPHDD, ISHARP,ISWIUN 
+        INTEGER, SAVE, POINTER :: ITABDDF, NDDFTABROWS
         DOUBLE PRECISION, SAVE, POINTER :: RHOFRESH,RHOSTD,CSTD
         DOUBLE PRECISION, SAVE, POINTER :: DRHODC,RELRHODIFF,HSEA
         DOUBLE PRECISION, SAVE,DIMENSION(:),ALLOCATABLE::
      1         RHONORM, ZEECELL, THICKCELL, ZETASWI
+        DOUBLE PRECISION, SAVE,DIMENSION(:,:),ALLOCATABLE:: DDFTAB
 C        DOUPLE PRECISION, SAVE, DIMENSION (:), ALLOCATABLE :: AMATDD
 c -------amatdd to save matrix before implicit dd term; but no need since we recompute (good to debug)
 C 
@@ -40,6 +42,9 @@ C2------ALLOCATE SCALAR VARIABLES VECTORS, AND INITIALIZE.
         IDDF = 1  ! INDEX THAT DENSITY DEPENDENT FLOW IS ACTIVE ON ONE SPECIES (HARDWIRE)
       ALLOCATE(RHOFRESH,RHOSTD,CSTD)
       ALLOCATE (DRHODC)
+      ALLOCATE(ITABDDF, NDDFTABROWS)
+      ITABDDF = 0
+      NDDFTABROWS = 0
 C
 C3------READ FRESHWATER DENSITY, STANDARD SOLUTION DENSITY,  STANDARD CONCENTRATION, AND OPTIONS
       CALL URDCOM(INDDF,IOUT,LINE)
@@ -57,6 +62,13 @@ C3------READ FRESHWATER DENSITY, STANDARD SOLUTION DENSITY,  STANDARD CONCENTRAT
         CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,ITHICKAV,R,IOUT,INDDF)
         CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IMPHDD,R,IOUT,INDDF)
         CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,ISHARP,R,IOUT,INDDF)
+      END IF
+C---------------------------------------------------------------------------
+C3B-----CHECK FOR OPTIONAL NONLINEAR KEYWORD ON SAME LINE
+      CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,I,R,IOUT,INDDF)
+      IF(LINE(ISTART:ISTOP).EQ.'NONLINEAR') THEN
+        ITABDDF = 1
+        CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,NDDFTABROWS,R,IOUT,INDDF)
       END IF      
 C---------------------------------------------------------------------------
 C3A-----REFLECT INPUT IN OUTPUT LISTING FILE
@@ -67,6 +79,24 @@ C3A-----REFLECT INPUT IN OUTPUT LISTING FILE
      1  /1X,'FLAG FOR USING THICKNESS WEIGHTED AVERAGE (ITHICKAV) =',I2
      1  /1X,'FLAG FOR IMPLICIT TREATMENT OF HEAD TERM (IMPHDD) =',I2 
      1  /1X,'FLAG FOR SHARP INTERFACE MODEL (ISHARP) =',I2 )
+C---------------------------------------------------------------------------
+C3C-----READ NONLINEAR DENSITY TABLE IF REQUESTED
+      IF(ITABDDF.NE.0) THEN
+        WRITE(IOUT,4)
+    4   FORMAT(1X,'NONLINEAR DENSITY OPTION:',/,1X,
+     1    'DENSITY IS PROVIDED AS TABULAR FUNCTION OF CONCENTRATION')
+        WRITE(IOUT,5) NDDFTABROWS
+    5   FORMAT(1X,'NUMBER OF ROWS IN DENSITY TABLE = ', I10)
+        ALLOCATE(DDFTAB(2,NDDFTABROWS))
+        WRITE(IOUT,6)
+    6   FORMAT(/10X,'DENSITY VS CONCENTRATION TABLE'/10X,30('-')/
+     *  10X,'  CONCENTRATION',7X,'     DENSITY')
+        DO ITROWS = 1,NDDFTABROWS
+          READ (INDDF,*) (DDFTAB(I,ITROWS),I=1,2)
+          WRITE(IOUT,7)(DDFTAB(I,ITROWS),I=1,2)
+    7     FORMAT(10X,E14.6,3X,E14.6)
+        ENDDO
+      ENDIF
 C---------------------------------------------------------------------------
 C4------FOR SHARP INTERFACE OPTION, ALLOCATE AND READ  VARIABLES
       IF(ISHARP.NE.0) THEN 
@@ -140,14 +170,19 @@ C     ------------------------------------------------------------------
       USE DDFMODULE
       USE GLOBAL,ONLY: IUNIT,IOUT,NEQS,NODES,IFREFM,IUNSTR,INDDF,HNEW,Sn
       USE GWTBCTMODULE, ONLY: CONC
-      DOUBLE PRECISION RNORM,CNC
+      DOUBLE PRECISION RNORM,CNC,RHOTAB,tabRHO
 C     ------------------------------------------------------------------
 C
 C1----COMPUTE RNORM
       CNC = CONC(N,1)
       IF(CNC.LT.0.0) CNC = 0.0
-      IF(CNC.GT.CSTD) CNC = CSTD
-      RNORM = (RHOFRESH + Sn(N) * DRHODC * CNC)/RHOFRESH
+      IF(ITABDDF.EQ.0) THEN
+        IF(CNC.GT.CSTD) CNC = CSTD
+        RNORM = (RHOFRESH + Sn(N) * DRHODC * CNC)/RHOFRESH
+      ELSE
+        RHOTAB = tabRHO(CNC,DDFTAB,NDDFTABROWS)
+        RNORM = 1.0D0 + Sn(N) * (RHOTAB / RHOFRESH - 1.0D0)
+      ENDIF
 C---------------------------------------------------------------------------
 C2----RETURN
       RETURN
@@ -186,8 +221,9 @@ C5--------ANGLED PIPE
           FDPTH = FLENG * SIN(FANGLE)
         ELSEIF(IFDIR.EQ.1)THEN
 C6--------HORIZONTAL PIPE
-          IFTYP =  ACLNNDS(I,2)
-          CALL CLNR(IFTYP,FRAD)
+          ISHAPE = ACLNNDS(I,7)
+          IFTYPE =  ACLNNDS(I,2)
+          CALL CLNR(ISHAPE,IFTYPE,FRAD)
 C          FDPTH = 2.0 * FRAD
           FDPTH = FRAD
         ELSEIF(IFDIR.EQ.0)THEN  
@@ -218,10 +254,11 @@ C     ------------------------------------------------------------------
       USE GWTBCTMODULE, ONLY: PRSITY,CONC,CONCO
       USE CLN1MODULE, ONLY: ACLNNDS
       USE DDFMODULE, ONLY: ZEECELL,RHONORM,DRHODC,RHOFRESH,CSTD,
-     1  THICKCELL, ITHICKAV, IMPHDD, ISHARP                                     !  , AMATDD
+     1  THICKCELL, ITHICKAV, IMPHDD, ISHARP,                                    !  , AMATDD
+     2  ITABDDF, NDDFTABROWS, DDFTAB
 C
       DOUBLE PRECISION QCON,ZEENJJ,RHO,VOL,HPHI,RHOTERM,AMAT_TERM,
-     1  CNC,CNCO,GRHO,OMEGA
+     1  CNC,CNCO,GRHO,OMEGA,tabRHO
 C     ------------------------------------------------------------------
 C     
       IF (ISHARP. NE. 0) RETURN 
@@ -328,14 +365,24 @@ C15------COMPUTE TERM AND PUT ON RHS
           VOL = AREA(N) * ACLNNDS(I,4)   
         ENDIF
 csp        RHO = VOL*PRSITY(N)*Sn(N)/RHONORM(N)*DRHODC
-        RHO = VOL*Sn(N)/RHONORM(N)/RHOFRESH*DRHODC
-        CNC = CONC(N,1)
-        IF(CNC.LT.0.0) CNC = 0.0
-        IF(CNC.GT.CSTD) CNC = CSTD
-        CNCO = CONCO(N,1)
-        IF(CNCO.LT.0.0) CNCO = 0.0
-        IF(CNCO.GT.CSTD) CNCO = CSTD        
-        RHO = RHO * (CNC - CNCO) / DELT
+        IF(ITABDDF.EQ.0) THEN
+          RHO = VOL*Sn(N)/RHONORM(N)/RHOFRESH*DRHODC
+          CNC = CONC(N,1)
+          IF(CNC.LT.0.0) CNC = 0.0
+          IF(CNC.GT.CSTD) CNC = CSTD
+          CNCO = CONCO(N,1)
+          IF(CNCO.LT.0.0) CNCO = 0.0
+          IF(CNCO.GT.CSTD) CNCO = CSTD        
+          RHO = RHO * (CNC - CNCO) / DELT
+        ELSE
+          RHO = VOL*Sn(N)/RHONORM(N)/RHOFRESH
+          CNC = CONC(N,1)
+          IF(CNC.LT.0.0) CNC = 0.0
+          CNCO = CONCO(N,1)
+          IF(CNCO.LT.0.0) CNCO = 0.0
+          RHO = RHO * (tabRHO(CNC,DDFTAB,NDDFTABROWS)
+     1              - tabRHO(CNCO,DDFTAB,NDDFTABROWS)) / DELT
+        ENDIF
         RHS(N) = RHS(N) + RHO
       ENDDO
 c16----return
@@ -356,13 +403,14 @@ C     ------------------------------------------------------------------
       USE SMSMODULE, ONLY: AMATFL
       USE GWTBCTMODULE, ONLY: PRSITY,CONC,CONCO
       USE DDFMODULE, ONLY: ZEECELL,RHONORM,DRHODC,RHOFRESH,CSTD, 
-     1  THICKCELL, ITHICKAV, IMPHDD, ISHARP                                     !  , AMATDD 
+     1  THICKCELL, ITHICKAV, IMPHDD, ISHARP,                                    !  , AMATDD 
+     2  ITABDDF, NDDFTABROWS, DDFTAB
       USE GWFBCFMODULE,ONLY:IBCFCB
       USE CLN1MODULE, ONLY: ACLNNDS
 C
        double precision,    DIMENSION(:),    ALLOCATABLE ::temp
       DOUBLE PRECISION QCON,ZEENJJ,RHO,VOL,STOIN,STOUT,SSTRG,STIN,SOUT,
-     1  ZERO,HPHI,RHOTERM,CNC,CNCO,STRG,GRHO,AMAT_TERM
+     1  ZERO,HPHI,RHOTERM,CNC,CNCO,STRG,GRHO,AMAT_TERM,tabRHO
       CHARACTER*16 TEXT
       DATA TEXT /' DENSITY STORAGE'/
 C     ------------------------------------------------------------------
@@ -430,14 +478,24 @@ C14------COMPUTE TERM AND PUT ON RHS
           VOL = AREA(N) * ACLNNDS(I,4)   
         ENDIF
 csp        RHO = VOL*PRSITY(N)*Sn(N)/RHONORM(N)*DRHODC
-        RHO = VOL*Sn(N)/RHONORM(N)/RHOFRESH*DRHODC
-        CNC = CONC(N,1)
-        IF(CNC.LT.0.0) CNC = 0.0
-        IF(CNC.GT.CSTD) CNC = CSTD
-        CNCO = CONCO(N,1)
-        IF(CNCO.LT.0.0) CNCO = 0.0
-        IF(CNCO.GT.CSTD) CNCO = CSTD        
-        RHO = RHO * (CNC - CNCO) / DELT
+        IF(ITABDDF.EQ.0) THEN
+          RHO = VOL*Sn(N)/RHONORM(N)/RHOFRESH*DRHODC
+          CNC = CONC(N,1)
+          IF(CNC.LT.0.0) CNC = 0.0
+          IF(CNC.GT.CSTD) CNC = CSTD
+          CNCO = CONCO(N,1)
+          IF(CNCO.LT.0.0) CNCO = 0.0
+          IF(CNCO.GT.CSTD) CNCO = CSTD        
+          RHO = RHO * (CNC - CNCO) / DELT
+        ELSE
+          RHO = VOL*Sn(N)/RHONORM(N)/RHOFRESH
+          CNC = CONC(N,1)
+          IF(CNC.LT.0.0) CNC = 0.0
+          CNCO = CONCO(N,1)
+          IF(CNCO.LT.0.0) CNCO = 0.0
+          RHO = RHO * (tabRHO(CNC,DDFTAB,NDDFTABROWS)
+     1              - tabRHO(CNCO,DDFTAB,NDDFTABROWS)) / DELT
+        ENDIF
         STRG = -RHO
 C
 C15-----STORE CELL-BY-CELL FLOW IN BUFFER AND ADD TO ACCUMULATORS.
@@ -461,13 +519,14 @@ C     ------------------------------------------------------------------
       USE SMSMODULE, ONLY: AMATFL
       USE GWTBCTMODULE, ONLY: PRSITY,CONC,CONCO
       USE DDFMODULE, ONLY: ZEECELL,RHONORM,DRHODC,RHOFRESH,CSTD, 
-     1  THICKCELL, ITHICKAV, IMPHDD, ISHARP                                     !  , AMATDD 
+     1  THICKCELL, ITHICKAV, IMPHDD, ISHARP,                                    !  , AMATDD 
+     2  ITABDDF, NDDFTABROWS, DDFTAB
       USE GWFBCFMODULE,ONLY:IBCFCB
       USE CLN1MODULE, ONLY: ACLNNDS
 C
        double precision,    DIMENSION(:),    ALLOCATABLE ::temp
       DOUBLE PRECISION QCON,ZEENJJ,RHO,VOL,STOIN,STOUT,SSTRG,STIN,SOUT,
-     1  ZERO,HPHI,RHOTERM,CNC,CNCO,STRG,GRHO,AMAT_TERM
+     1  ZERO,HPHI,RHOTERM,CNC,CNCO,STRG,GRHO,AMAT_TERM,tabRHO
       CHARACTER*16 TEXT
       DATA TEXT /' DENSITY STORAGE'/
 C     ------------------------------------------------------------------
@@ -499,14 +558,24 @@ C14------COMPUTE TERM AND PUT ON RHS
           VOL = AREA(N) * ACLNNDS(I,4)   
         ENDIF
 csp        RHO = VOL*PRSITY(N)*Sn(N)/RHONORM(N)*DRHODC
-        RHO = VOL*Sn(N)/RHONORM(N)/RHOFRESH*DRHODC
-        CNC = CONC(N,1)
-        IF(CNC.LT.0.0) CNC = 0.0
-        IF(CNC.GT.CSTD) CNC = CSTD
-        CNCO = CONCO(N,1)
-        IF(CNCO.LT.0.0) CNCO = 0.0
-        IF(CNCO.GT.CSTD) CNCO = CSTD        
-        RHO = RHO * (CNC - CNCO) / DELT
+        IF(ITABDDF.EQ.0) THEN
+          RHO = VOL*Sn(N)/RHONORM(N)/RHOFRESH*DRHODC
+          CNC = CONC(N,1)
+          IF(CNC.LT.0.0) CNC = 0.0
+          IF(CNC.GT.CSTD) CNC = CSTD
+          CNCO = CONCO(N,1)
+          IF(CNCO.LT.0.0) CNCO = 0.0
+          IF(CNCO.GT.CSTD) CNCO = CSTD        
+          RHO = RHO * (CNC - CNCO) / DELT
+        ELSE
+          RHO = VOL*Sn(N)/RHONORM(N)/RHOFRESH
+          CNC = CONC(N,1)
+          IF(CNC.LT.0.0) CNC = 0.0
+          CNCO = CONCO(N,1)
+          IF(CNCO.LT.0.0) CNCO = 0.0
+          RHO = RHO * (tabRHO(CNC,DDFTAB,NDDFTABROWS)
+     1              - tabRHO(CNCO,DDFTAB,NDDFTABROWS)) / DELT
+        ENDIF
         STRG = -RHO
 C
 C15-----ADD CELL-BY-CELL FLOW TO BUFF AND ACCUMULATORS.
@@ -562,6 +631,8 @@ C
           DEALLOCATE(RHONORM,ZEECELL)   
           IF(ITHICKAV.NE.0)DEALLOCATE(THICKCELL)
         ENDIF  
+        IF(ITABDDF.NE.0) DEALLOCATE(DDFTAB)
+        DEALLOCATE(ITABDDF,NDDFTABROWS)
         DEALLOCATE (ISHARP,ITHICKAV)  
 C
       RETURN
@@ -801,8 +872,9 @@ C2A-------VERTICAL LINE SEGMENT
             TTOP = ACLNNDS(ICLN,4) + BBOT 
           ELSEIF(IFDIR.EQ.1) THEN 
 C2B-------HORIZONTAL LINE SEGMENT 
-            IC = ACLNNDS(ICLN,2)
-            CALL CLNR(IC,FRAD)
+            ISHAPE = ACLNNDS(ICLN,7)
+            IFTYPE = ACLNNDS(ICLN,2)
+            CALL CLNR(ISHAPE,IFTYPE,FRAD)
             TOP = 2.0 * FRAD + BBOT
           ELSEIF(IFDIR.EQ.2)THEN  
 C2C-------ANGLED LINE SEGMENT                 
@@ -1100,6 +1172,45 @@ C6------RETURN.
       RETURN
 C
       END
+C-----------------------------------------------------------------------
+      double precision function tabRHO
+     *       (pvar,ddftab,nddftabrows)
+C     ******************************************************************
+C     INTERPOLATE DENSITY FROM TABLE FOR A GIVEN CONCENTRATION pvar
+C     ******************************************************************      
+C           
+C       SPECIFICATIONS
+C     ------------------------------------------------------------------
+      real*8 pvar, hd, a, b, hir, fn, Fir 
+      double precision ddftab(2,nddftabrows)
+C     ------------------------------------------------------------------
+      hd = ddftab(1,1)
+      if(pvar. le. hd) then 
+        tabRHO =  ddftab(2,1) 
+        return
+      endif    
+      hd = ddftab(1,nddftabrows)
+      if(pvar. ge. hd) then 
+        tabRHO =  ddftab(2,nddftabrows) 
+        return
+      endif          
+      do irow = 1,nddftabrows
+         hir = ddftab(1,irow)
+         if (pvar. gt. hir) go to 10 
+         ir = irow
+         irm1 = irow - 1
+         a = ddftab(2,irow) - ddftab(2,irm1)
+         b = hir - ddftab(1,irm1)
+         fn = a / b * (pvar - hir)
+         fir = ddftab(2,irow)
+         tabRHO = Fir + fn
+         go to 20
+10       continue         
+      enddo    
+20    continue       
+c      
+      return
+      end function tabRHO        
 C-----------------------------------------------------------------------
 
 

@@ -120,10 +120,12 @@ C13------CALL UBUDSV TO SAVE THEM.
           CALL UBUDSVU(KSTP,KPER,TEXT(1),IBCTCB,BUFF,NODES,
      1                          IOUT,PERTIM,TOTIM)
         ENDIF
-        IF(INCLN.GT.0.AND.ICLNMB.NE.0)THEN
-           CALL UBUDSVU(KSTP,KPER,TEXT(2),ICLNMB,BUFF(NODES+1:NEQS),
+        IF(INCLN.GT.0) THEN
+          IF(ICLNMB.NE.0)THEN
+            CALL UBUDSVU(KSTP,KPER,TEXT(2),ICLNMB,BUFF(NODES+1:NEQS),
      1                 NCLNNDS,IOUT,PERTIM,TOTIM)
-        ENDIF
+          ENDIF
+        ENDIF    
       ENDIF
 C
 C14------MOVE RATES, VOLUMES & LABELS INTO ARRAYS FOR PRINTING.
@@ -1534,7 +1536,7 @@ C     ------------------------------------------------------------------
       USE GWTBCTMODULE, ONLY: ICBUND,CONC,MSUMT,VBVLT,VBNMT,IPCBFLAG,
      1  MCOMPT,IHEAT
       USE CLN1MODULE, ONLY: ICLNMB,NCLNNDS
-      USE GWTDPTMODULE, ONLY: CONCIM,DDTTR
+      USE GWTDPTMODULE, ONLY: CONCIM,DDTTR,DDTTRSD,ISD_MASS_TR
 
 C
       CHARACTER*16 TEXT
@@ -1615,7 +1617,11 @@ C5C---BACK-CALCULATE MASS FLUX FOR PCB NODE.
 C--------------------------------------------------------
 C ------DUAL POROSITY TRANSPORT INTO /OUT OF MATRIX TERM
       IF(IDPT. NE.0) THEN
-        QQ=QQ-(DDTTR(N) * (CONCIM(N,ICOMP)-CONC(N,ICOMP)))
+        IF(ISD_MASS_TR.EQ.1) THEN
+          QQ=QQ-(DDTTRSD(N,ICOMP) * (CONCIM(N,ICOMP)-CONC(N,ICOMP)))
+        ELSE
+          QQ=QQ-(DDTTR(N) * (CONCIM(N,ICOMP)-CONC(N,ICOMP)))
+        ENDIF
       ENDIF
       QQ=QQ + RHSKPT(L,ICOMP)
       Q = QQ
@@ -2570,7 +2576,7 @@ C        SPECIFICATIONS:
 C     ------------------------------------------------------------------
       USE GLOBAL,       ONLY:IBOUND,RHS,IA,JA,AMAT
       USE GWFDRTMODULE, ONLY:NDRTCL,DRTF,NDRTVL,IDRTFL,DRTAUX,
-     1    IDCHANGEC,IDCHNGTYP
+     1    IDCHANGEC,IDCHNGTYP,NodDRT 
       USE GWTBCTMODULE, ONLY: ICBUND,CONC
       DOUBLE PRECISION Co,Q,QIN,MASSIN
 C     ------------------------------------------------------------------
@@ -2582,6 +2588,7 @@ C1------IF NUMBER OF DRT CELLS <= 0 THEN RETURN.
       CALL CONCIAUX(ICOMP,NAUX,DRTAUX,IAUX)
 C
 C2------PROCESS EACH DRAIN-RETURN CELL IN THE LIST.
+      IRT = 0
       DO 100 L=1,NDRTCL
       ND=DRTF(1,L)
 C
@@ -2592,10 +2599,21 @@ C
 C4--------DRAIN IS OUTFLOW OUTFLOW, PUT Q ON LHS DIAGONAL
         AMAT(IA(ND)) = AMAT(IA(ND)) + Q
 C
-C5--------TAKE CARE OF RETURN FLOW TERM
+C5--------TAKE CARE OF RETURN FLOW TERM ON NODE OR SPREADING GROUND
         IF (IDRTFL.GT.0) THEN
-          INR = DRTF(6,L)
-          IF (INR.NE.0) THEN
+          INRi = DRTF(6,L)
+          IF (INRi.NE.0) THEN
+            IF (INRi. GT. 0) NumRT = 1        ! JUST RETURN TO THAT ONE NODE 
+            IF (INRi. LT. 0) NumRT = -INRi    ! RETURN NUMBER OF NODES ARE -INRi
+C            
+            DO JJ = 1,NumRT
+              IRT = IRT + 1
+              IF(INRi. GT. 0) THEN
+                INR = INRi          ! NODE NUMBER OF RETURN NODE
+              ELSE
+                INR = NodDRT(IRT)   ! NODE NUMBER OF RETURN NODE
+              ENDIF    
+C              
             IF (ICBUND(INR) .GT. 0) THEN
               Co = CONC(ND,ICOMP)
               QIN = DRTF(NDRTVL-1,L)
@@ -2606,10 +2624,16 @@ C6------------MAKE CHANGE TO SOLUTE BEFORE RETURNING FLOW
                 IF(IDCHNGTYP(L).EQ.2) MASSIN = MASSIN + DRTF(9+IAUX,L)
                 IF(IDCHNGTYP(L).EQ.3) MASSIN = QIN*DRTF(9+IAUX,L)
                 IF(IDCHNGTYP(L).EQ.4) MASSIN = DRTF(9+IAUX,L)
+                IF(IDCHNGTYP(L).EQ.5) THEN
+                  IF(Co .GT. DRTF(9+IAUX,L)) MASSIN = QIN*DRTF(9+IAUX,L)
+                ENDIF
+                IF(IDCHNGTYP(L).EQ.6) 
+     *             MASSIN = MASSIN * ( 1.0 - DRTF(9+IAUX,L) )
               ENDIF
 C7------------PUT NET RETURN FLOW MASS ON RHS OF EQUATION
               RHS(INR) = RHS(INR) - MASSIN
             ENDIF
+            ENDDO
           ENDIF
         ENDIF
 C
@@ -2710,7 +2734,8 @@ C10-----COMPUTE MASS FLUX AT RETURN FLOW NODE BOUNDARY
             IF (ICBUND(INR) .GT. 0) THEN
               QFIN = DRTF(NDRTVL-1,L)
               QQIN = QFIN * Co
-C9B-----------MAKE CHANGE TO SOLUTE BEFORE RETURNING FLOW
+C9B-----------MAKE CHANGE TO SOLUTE BEFORE RETURNING FLOW 
+C             FOR BOTH SPREADING GROUNDS AND RETURN NODES TOTAL MASS IS QQIN 
               IF(IDCHANGEC.NE.0.AND.IAUX.NE.0)THEN
                 IF(IDCHNGTYP(L).EQ.1) QQIN = QQIN + QFIN*DRTF(9+IAUX,L)
                 IF(IDCHNGTYP(L).EQ.2) QQIN = QQIN + DRTF(9+IAUX,L)
@@ -2718,7 +2743,8 @@ C9B-----------MAKE CHANGE TO SOLUTE BEFORE RETURNING FLOW
                 IF(IDCHNGTYP(L).EQ.4) QQIN = DRTF(9+IAUX,L)
                 IF(IDCHNGTYP(L).EQ.5) THEN
                    IF(Co .GT. DRTF(9+IAUX,L)) QQIN = QFIN*DRTF(9+IAUX,L)
-                ENDIF   
+                ENDIF 
+                IF(IDCHNGTYP(L).EQ.6) QQIN = QQIN*(1.0-DRTF(9+IAUX,L))
               ENDIF
               QIN = QQIN
               RATIN=RATIN+QQIN
@@ -2877,6 +2903,11 @@ C6------------MAKE CHANGE TO SOLUTE BEFORE RETURNING FLOW
                   IF(IQCHNGTYP(L).EQ.2) MASSIN = MASSIN + QRTF(6+IAUX,L)
                   IF(IQCHNGTYP(L).EQ.3) MASSIN= QIN*QRTF(6+IAUX,L)
                   IF(IQCHNGTYP(L).EQ.4) MASSIN =  QRTF(6+IAUX,L)
+                IF(IQCHNGTYP(L).EQ.5) THEN
+                  IF(Co .GT. QRTF(6+IAUX,L)) MASSIN = QIN*QRTF(6+IAUX,L)
+                ENDIF
+                  IF(IQCHNGTYP(L).EQ.6) 
+     *              MASSIN = MASSIN * ( 1.0 - QRTF(6+IAUX,L) )
                 ENDIF
                 RHS(INR) = RHS(INR) - MASSIN
               END IF
@@ -2996,8 +3027,9 @@ C9B-----------MAKE CHANGE TO SOLUTE BEFORE RETURNING FLOW
                 IF(IQCHNGTYP(L).EQ.3) QQIN = QFIN*QRTF(6+IAUX,L)
                 IF(IQCHNGTYP(L).EQ.4) QQIN = QRTF(6+IAUX,L)
                 IF(IQCHNGTYP(L).EQ.5) THEN
-                   IF(Co .GT. QRTF(9+IAUX,L)) QQIN = QFIN*QRTF(9+IAUX,L)
-                ENDIF                
+                   IF(Co .GT. QRTF(6+IAUX,L)) QQIN = QFIN*QRTF(6+IAUX,L)
+                ENDIF 
+                IF(IQCHNGTYP(L).EQ.6) QQIN = QQIN*(1.0-QRTF(6+IAUX,L))
               ENDIF
                 QIN = QQIN
                 RATIN=RATIN+QQIN

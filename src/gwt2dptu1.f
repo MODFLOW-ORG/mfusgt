@@ -37,9 +37,9 @@ C
       DATA ANAME(13) /'        DPT INITIAL CONC'/
       DATA ANAME(14) /'     IMMOBILE DOMAIN SAT'/
       DATA ANAME(15) /'      SOIL HEAT CAPACITY'/
-      DATA ANAME(16) /'             TEMPERATURE'/      
-      DATA ANAME(17) /'    ZERO-ORDER DECAY A-W'/       
-      DATA ANAME(18) /'   FIRST-ORDER DECAY A-W'/              
+      DATA ANAME(16) /'             TEMPERATURE'/
+      DATA ANAME(17) /'    ZERO-ORDER DECAY A-W'/
+      DATA ANAME(18) /'   FIRST-ORDER DECAY A-W'/
 C     ------------------------------------------------------------------
 C
 C1------IDENTIFY PACKAGE
@@ -51,8 +51,9 @@ C
 C-----------------------------------------------------------------------
 C2------ALLOCATE VARIABLES
       ALLOCATE(IDPTCB,IDPTCON,IC_IBNDIN_FLG,IADSORBIM,
-     1  IDISPIM,IZODIM,IFODIM,IAW_ADSORBIM)
+     1  IDISPIM,IZODIM,IFODIM,IAW_ADSORBIM,ISD_MASS_TR)
       IAW_ADSORBIM = 0
+      ISD_MASS_TR = 0
 C
 C-----------------------------------------------------------------------
 C3------READ GENERAL DPT INFORMATION AND FLAGS
@@ -73,7 +74,7 @@ C3------READ GENERAL DPT INFORMATION AND FLAGS
         CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IFODIM,R,IOUT,IN)
       ENDIF
 2     FORMAT(7I10)
-C      
+C
 C3B-----PRINT VALUES
       WRITE(IOUT,11) IDPTCB,IDPTCON,IC_BNDIM_FLG,IADSORBIM,
      *  IDISPIM,IZODIM,IFODIM
@@ -100,40 +101,43 @@ C3C--------GET OPTIONS FOR WHEN FLOW IS NOT DUAL POROSITY
         IMSAT = 1
 100     CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,I,R,IOUT,IN)
         IF(LINE(ISTART:ISTOP).EQ.'FRAHK') THEN
-C3D-------SET FLAG FOR HK TO BE FRACTURE-DOMAIN VALUE.   
+C3D-------SET FLAG FOR HK TO BE FRACTURE-DOMAIN VALUE.
           IFRAHK = 1
-        ENDIF 
-C3E-------SET FLAG FOR IMMOBILE DOMAIN SATURATION TREATMENT.          
+        ENDIF
+C3E-------SET FLAG FOR IMMOBILE DOMAIN SATURATION TREATMENT.
         IF(LINE(ISTART:ISTOP).EQ.'MOBILESAT') THEN
-C3F-------SET FLAG.   
+C3F-------SET FLAG.
           IMSAT = 2
         ELSEIF(LINE(ISTART:ISTOP).EQ.'INPUTSAT') THEN
-C3G-------SET FLAG.   
+C3G-------SET FLAG.
           IMSAT = 3
-        ENDIF      
-        IF(LLOC.LT.200) GO TO 100 
+        ENDIF
+        IF(LLOC.LT.200) GO TO 100
 C3H----------PRINT OPTION FLAG VALUES
         IF(IFRAHK.EQ.1) WRITE(IOUT,12) IFRAHK
 12      FORMAT(1X,'CONDUCTANCE ARE FOR FRACTURE VOLUME; (IFRAHK)',12X,
      1   '=',I4)
         IF(IFRAHK.EQ.0) WRITE(IOUT,13) IFRAHK
-13      FORMAT(1X,'CONDUCTANCE ARE FOR TOTAL (FRACTURE + MATRIX)', 
+13      FORMAT(1X,'CONDUCTANCE ARE FOR TOTAL (FRACTURE + MATRIX)',
      1            1X,'DOMAIN; (IFRAHK)  =',I4)
         IF(IMSAT.EQ.1) WRITE(IOUT,14) IMSAT
-14      FORMAT(1X,'IMMOBILE DOMAIN SATURATIONS SET TO UNITY)', 
+14      FORMAT(1X,'IMMOBILE DOMAIN SATURATIONS SET TO UNITY)',
      1            12X, '(IMSAT)  =',I4)
         IF(IMSAT.EQ.2) WRITE(IOUT,15) IMSAT
-15      FORMAT(1X,'IMMOBILE DOMAIN SATURATIONS SET SAME AS FOR MOBILE', 
-     1            1X, 'DOMAIN (IMSAT)  =',I4)        
+15      FORMAT(1X,'IMMOBILE DOMAIN SATURATIONS SET SAME AS FOR MOBILE',
+     1            1X, 'DOMAIN (IMSAT)  =',I4)
         IF(IMSAT.EQ.3) WRITE(IOUT,16) IMSAT
-16      FORMAT(1X,'IMMOBILE DOMAIN SATURATIONS ARE INPUT)', 
-     1            12X, '(IMSAT)  =',I4)        
+16      FORMAT(1X,'IMMOBILE DOMAIN SATURATIONS ARE INPUT)',
+     1            12X, '(IMSAT)  =',I4)
         ENDIF
-C3I ----READ OTHER OPTIONS (A-W ADSORPTION)         
+        IF(ISD_MASS_TR.EQ.1) WRITE(IOUT,17) ISD_MASS_TR
+17      FORMAT(1X,'SPECIES-DEPENDENT MASS TRANSFER RATE (ISD_MASS_TR)',
+     1  7X,'=',I4)
+C3I ----READ OTHER OPTIONS (A-W ADSORPTION)
       LLOC = 1
 105   CALL URWORD(LINE,LLOC,ISTART,ISTOP,1,I,R,IOUT,IN)
       IF(LINE(ISTART:ISTOP).EQ.'A-W_ADSORBIM') THEN
-C3D-------SET FLAG FOR HK TO BE FRACTURE-DOMAIN VALUE.   
+C3D-------SET FLAG FOR HK TO BE FRACTURE-DOMAIN VALUE.
         IAW_ADSORBIM = 1
         ALLOCATE(IAREA_FNIM,IKAWI_FNIM,ITAB_AWIIM)
         ITAB_AWIIM = 0
@@ -146,9 +150,11 @@ C3D-------SET FLAG FOR HK TO BE FRACTURE-DOMAIN VALUE.
         CALL URWORD(LINE,LLOC,ISTART,ISTOP,2,IKAWI_FNIM,R,IOUT,IN)
         WRITE(IOUT,47) IKAWI_FNIM
 47      FORMAT(1X,'K_WAI FUNCTION INDEX (IKAWI_FNIM) = ', I10)
+      ELSEIF(LINE(ISTART:ISTOP).EQ.'SD_MASS_TR') THEN
+        ISD_MASS_TR = 1
       ELSEIF(LINE(ISTART:ISTOP).EQ.'SOMETHINGELSE') THEN
-            
-      ENDIF         
+
+      ENDIF
       IF(LLOC.LT.200) GO TO 105
 C ---------------------------------------------------------------------
 C-------ALLOCATE SPACE FOR AIR-WATER ADSORPTION ARRAYS
@@ -157,71 +163,76 @@ C-------ALLOCATE SPACE FOR AIR-WATER ADSORPTION ARRAYS
         ENDIF
 C-----------------------------------------------------------------------
 C4-----ALLOCATE ARRAYS AND INITIALIZE
-      ALLOCATE(DDTTR(NODES),CONCIM(NODES,NTCOMP),CONCOIM(NODES,NTCOMP),
+      IF(ISD_MASS_TR.EQ.0) THEN
+        ALLOCATE(DDTTR(NODES))
+      ELSE
+        ALLOCATE(DDTTRSD(NODES,MCOMPT))
+      ENDIF
+      ALLOCATE(CONCIM(NODES,NTCOMP),CONCOIM(NODES,NTCOMP),
      1 ICBUNDIM(NODES),PRSITYIM(NODES),BULKDIM(NODES),MASSBCTIM(NTCOMP))
       ALLOCATE(DIADDT(NODES),RDDT(NODES),OFFDDTM(NODES),OFFDDTIM(NODES))
-C      
-      IF(ICHAIN.NE.0.AND.ISPRCT.NE.0) THEN 
-        ALLOCATE (SPTLRCTIM(NODES,NTCOMP,NTCOMP))  
-      ENDIF    
-C      
-      IF(IADSORBIM.NE.0) ALLOCATE (ADSORBIM(NODES,MCOMPT))
-      IF(IADSORBIM.EQ.2.OR.IADSORBIM.EQ.3) 
-     1  ALLOCATE (FLICHIM(NODES,MCOMP))
+C
+      IF(ICHAIN.NE.0.AND.ISPRCT.NE.0) THEN
+        ALLOCATE (SPTLRCTIM(NODES,NTCOMP,NTCOMP))
+      ENDIF
+C
+      IF(IADSORBIM.NE.0) ALLOCATE (ADSORBIM(NODES,NTCOMP))
+      IF(IADSORBIM.EQ.2.OR.IADSORBIM.EQ.3)
+     1  ALLOCATE (FLICHIM(NODES,NTCOMP))
       IF(IDISPIM.GT.0)THEN
         ALLOCATE(DLIM(NODES))
       ENDIF
       IF(IZODIM.EQ.1)THEN
-        ALLOCATE(ZODRWIM(NODES,MCOMP))
-        ZODRW = 0.
+        ALLOCATE(ZODRWIM(NODES,NTCOMP))
+        ZODRWIM = 0.
       ELSE
         IF(IADSORBIM.GT.0)THEN
           IF(IZODIM.EQ.2)THEN
-             ALLOCATE(ZODRSIM(NODES,MCOMP))
+             ALLOCATE(ZODRSIM(NODES,NTCOMP))
              ZODRSIM = 0.
           ELSEIF(IZODIM.EQ.3)THEN
-            ALLOCATE(ZODRWIM(NODES,MCOMP))
+            ALLOCATE(ZODRWIM(NODES,NTCOMP))
             ZODRWIM = 0.
-            ALLOCATE(ZODRSIM(NODES,MCOMP))
+            ALLOCATE(ZODRSIM(NODES,NTCOMP))
             ZODRSIM = 0.
           ENDIF
-        ENDIF  
+        ENDIF
         IF(IAW_ADSORBIM.GT.0) THEN
           IF(IZODIM.EQ.4)THEN
-            ALLOCATE(ZODRWIM(NODES,MCOMP))
-            ZODRW = 0.
-            ALLOCATE(ZODRSIM(NODES,MCOMP))
-            ZODRS = 0.
-            ALLOCATE(ZODRAWIM(NODES,MCOMP))
-            ZODRAWIM = 0.           
-          ENDIF            
-        ENDIF  
+            ALLOCATE(ZODRWIM(NODES,NTCOMP))
+            ZODRWIM = 0.
+            ALLOCATE(ZODRSIM(NODES,NTCOMP))
+            ZODRSIM = 0.
+            ALLOCATE(ZODRAWIM(NODES,NTCOMP))
+            ZODRAWIM = 0.
+          ENDIF
+        ENDIF
       ENDIF
       IF(IFODIM.EQ.1)THEN
-        ALLOCATE(FODRWIM(NODES,MCOMP))
+        ALLOCATE(FODRWIM(NODES,NTCOMP))
         FODRWIM = 0.
       ELSE
         IF(IADSORBIM.GT.0)THEN
           IF(IFODIM.EQ.2)THEN
-             ALLOCATE(FODRSIM(NODES,MCOMP))
+             ALLOCATE(FODRSIM(NODES,NTCOMP))
              FODRSIM = 0.
           ELSEIF(IFODIM.EQ.3)THEN
-            ALLOCATE(FODRWIM(NODES,MCOMP))
+            ALLOCATE(FODRWIM(NODES,NTCOMP))
             FODRWIM = 0.
-            ALLOCATE(FODRSIM(NODES,MCOMP))
+            ALLOCATE(FODRSIM(NODES,NTCOMP))
             FODRSIM = 0.
           ENDIF
-        ENDIF  
+        ENDIF
         IF(IAW_ADSORBIM.GT.0) THEN
           IF(IFODIM.EQ.4)THEN
-            ALLOCATE(FODRWIM(NEQS,MCOMP))
-            FODRW = 0.
-            ALLOCATE(FODRSIM(NEQS,MCOMP))
-            FODRS = 0.
-            ALLOCATE(FODRAWIM(NEQS,MCOMP))
-            FODRAW = 0.           
-          ENDIF            
-        ENDIF              
+            ALLOCATE(FODRWIM(NODES,NTCOMP))
+            FODRWIM = 0.
+            ALLOCATE(FODRSIM(NODES,NTCOMP))
+            FODRSIM = 0.
+            ALLOCATE(FODRAWIM(NODES,NTCOMP))
+            FODRAWIM = 0.
+          ENDIF
+        ENDIF
       ENDIF
 C------------------------------------------------------------------
 C5------FILL BOUNDARY ARRAY(ICBUNDIM).
@@ -287,27 +298,29 @@ C6D-----READ DISPERSION COEFFICIENT IF DP FLOW WAS ON
         ENDDO
       ENDIF
 C6E-----READ IMMOBILE DOMAIN MASS TRANSFER RATE INTO ARRAY DDTTR
-      DO K = 1,NLAY
-        NNDLAY = NODLAY(K)
-        NSTRT = NODLAY(K-1)+1
-        NDSLAY = NNDLAY - NODLAY(K-1)
-        CALL U1DREL(DDTTR(NSTRT),ANAME(6),NDSLAY,K,IN,IOUT)
-      ENDDO
-C6F-----SET OR READ IMMOBILE DOMAIN SATURATIONS IF DUAL DOMAIN FLOW IS NOT SIMULATED      
+      IF(ISD_MASS_TR.EQ.0) THEN
+        DO K = 1,NLAY
+          NNDLAY = NODLAY(K)
+          NSTRT = NODLAY(K-1)+1
+          NDSLAY = NNDLAY - NODLAY(K-1)
+          CALL U1DREL(DDTTR(NSTRT),ANAME(6),NDSLAY,K,IN,IOUT)
+        ENDDO
+      ENDIF
+C6F-----SET OR READ IMMOBILE DOMAIN SATURATIONS IF DUAL DOMAIN FLOW IS NOT SIMULATED
       IF(IDPF.EQ.0)THEN
 C6F1-----ALLOCATE ARRAY
         ALLOCATE(SnIM(NODES))
         SoIM => SnIM
         IF(IMSAT.EQ.1)THEN
-C6F2---------IMMOBILE DOMAIN SATURATIONS SET TO UNITY            
+C6F2---------IMMOBILE DOMAIN SATURATIONS SET TO UNITY
           DO N=1,NODES
             SNIM(N) = 1.0
           ENDDO
         ELSEIF(IMSAT.EQ.2)THEN
-C6F3---------IMMOBILE DOMAIN SATURATIONS SET SAME AS FOR MOBILE DOMAIN            
+C6F3---------IMMOBILE DOMAIN SATURATIONS SET SAME AS FOR MOBILE DOMAIN
           DO N=1,NODES
             SNIM(N) = Sn(N)
-          ENDDO  
+          ENDDO
         ELSEIF(IMSAT.EQ.3)THEN
 C6F4---------IMMOBILE DOMAIN SATURATIONS ARE INPUT
           DO K=1,NLAY
@@ -320,7 +333,7 @@ C6F4---------IMMOBILE DOMAIN SATURATIONS ARE INPUT
             SNIM(N) = TEMPC(N)
           ENDDO
         ENDIF
-      ENDIF   
+      ENDIF
 C
 C-----------------------------------------------------------------------
 C6G----READ HEAT PARAMETERS IF IHEAT IS ON
@@ -351,9 +364,9 @@ C-----------------------------------------------------------------------
       DO ICOMP=1,NTCOMP
         WRITE(IOUT,20) ICOMP
 20      FORMAT(80('-')/1X,'THE FOLLOWING ARRAYS ARE READ FOR SPECIES ',
-     *    1X,'NUMBER ',I3/80('-')) 
+     *    1X,'NUMBER ',I3/80('-'))
 C8 -----------READ STOCHIOMETRY OF SPATIALLY VARIABLE
-        IF (ICHAIN.NE.0.AND.ISPRCT.NE.0) THEN      
+        IF (ICHAIN.NE.0.AND.ISPRCT.NE.0) THEN
           NPAREN = NPARENT(ICOMP)
           DO JCOMP = 1,NPAREN
             WRITE(IOUT,21) ICOMP, JCOMP
@@ -364,16 +377,18 @@ C8 -----------READ STOCHIOMETRY OF SPATIALLY VARIABLE
               NSTRT = NODLAY(K-1)+1
               NDSLAY = NNDLAY - NODLAY(K-1)
               CALL U1DREL(TEMPC(NSTRT),ANAME(4),NDSLAY,K,IN,IOUT)
-            ENDDO              
+            ENDDO
             DO N = 1, NODES
               SPTLRCTIM(N,ICOMP,JCOMP) = TEMPC(N)
-            ENDDO              
-          ENDDO 
-        ENDIF      
+            ENDDO
+          ENDDO
+        ENDIF
 C --------------------------------------------------------
 C9 --------SKIP ADSORPTION AND DECAY FOR IMMOBILE COMPONENTS
         IF(IHEAT.EQ.1.AND.ICOMP.EQ.MCOMPT) GO TO 101 !TEMPERATURE DOES NOT HAVE ADSORPTION OR DECAY OR PARENT
-        IF(ICOMP .GT. MCOMPT) GO TO 101     !IMMOBILE COMPONENTS DO NOT HAVE ADSORPTION OR DECAY OR PARENT        
+C-------IMMOBILE COMPONENTS (ICOMP > MCOMPT) DO READ ADSORPTION AND DECAY
+C-------DATA JUST LIKE MOBILE COMPONENTS; ONLY THE MOBILE<->IMMOBILE MASS
+C-------TRANSFER IS EXCLUDED FOR THEM (HANDLED IN GWT2DPTU1FM)
 C---------------------------------------------------------
 C10 -------IF AW_ADSORB OPTION IS ON THEN READ AW-PARTITIONING DATA
         IF(IAW_ADSORBIM.NE.0)THEN
@@ -455,7 +470,7 @@ C10C-------ZERO ORDER DECAY IN WATER AND ON SOIL IF FLAG IZODIM=3
             ENDDO
           ENDIF
         ENDIF
-        IF(IAW_ADSORBIM.EQ.1)THEN 
+        IF(IAW_ADSORBIM.EQ.1)THEN
           IF(IZODIM.EQ.4) THEN
 C10C-------ZERO ORDER DECAY IN WATER, ON SOIL AND ON AIR-WATER INTERFACE IF FLAG IZODIM=4
             DO K=1,NLAY
@@ -475,7 +490,7 @@ C10C-------ZERO ORDER DECAY IN WATER, ON SOIL AND ON AIR-WATER INTERFACE IF FLAG
             ENDDO
             DO N = 1, NODES
               ZODRSIM(N,ICOMP) = TEMPC(N)
-            ENDDO 
+            ENDDO
             DO K=1,NLAY
               NNDLAY = NODLAY(K)
               NSTRT = NODLAY(K-1)+1
@@ -484,9 +499,9 @@ C10C-------ZERO ORDER DECAY IN WATER, ON SOIL AND ON AIR-WATER INTERFACE IF FLAG
             ENDDO
             DO N = 1, NODES
               ZODRAWIM(N,ICOMP) = TEMPC(N)
-            ENDDO 
-          ENDIF    
-        ENDIF    
+            ENDDO
+          ENDIF
+        ENDIF
       ENDIF
 C---------------------------------------------------------
 C11-----READ FIRST ORDER DECAY COEFFICIENTS
@@ -536,7 +551,7 @@ C11C-----FIRST ORDER DECAY IN WATER AND ON SOIL IF FLAG IFODIM=3
             ENDDO
           ENDIF
           ENDIF
-        IF(IAW_ADSORBIM.EQ.1)THEN 
+        IF(IAW_ADSORBIM.EQ.1)THEN
           IF(IFODIM.EQ.4) THEN
 C10C-------ZERO ORDER DECAY IN WATER, ON SOIL AND ON AIR-WATER INTERFACE IF FLAG IFODIM=4
             DO K=1,NLAY
@@ -556,7 +571,7 @@ C10C-------ZERO ORDER DECAY IN WATER, ON SOIL AND ON AIR-WATER INTERFACE IF FLAG
             ENDDO
             DO N = 1, NODES
               FODRSIM(N,ICOMP) = TEMPC(N)
-            ENDDO 
+            ENDDO
             DO K=1,NLAY
               NNDLAY = NODLAY(K)
               NSTRT = NODLAY(K-1)+1
@@ -565,16 +580,30 @@ C10C-------ZERO ORDER DECAY IN WATER, ON SOIL AND ON AIR-WATER INTERFACE IF FLAG
             ENDDO
             DO N = 1, NODES
               FODRAWIM(N,ICOMP) = TEMPC(N)
-            ENDDO 
-          ENDIF    
-        ENDIF              
+            ENDDO
+          ENDIF
+        ENDIF
+      ENDIF
+C
+C---------------------------------------------------------
+C11B-----READ SPECIES-DEPENDENT MASS TRANSFER RATE INTO DDTTRSD
+      IF(ISD_MASS_TR.EQ.1.AND.ICOMP.LE.MCOMPT) THEN
+        DO K=1,NLAY
+          NNDLAY = NODLAY(K)
+          NSTRT = NODLAY(K-1)+1
+          NDSLAY = NNDLAY - NODLAY(K-1)
+          CALL U1DREL(TEMPC(NSTRT),ANAME(6),NDSLAY,K,IN,IOUT)
+        ENDDO
+        DO N = 1, NODES
+          DDTTRSD(N,ICOMP) = TEMPC(N)
+        ENDDO
       ENDIF
 C
 C---------------------------------------------------------
 C12------CONCENTRATION OF EACH SPECIES
 101   CONTINUE
       CNAME = ANAME(13)
-      IF(IHEAT.EQ.1.AND.ICOMP.EQ.MCOMPT) CNAME = ANAME(16)      
+      IF(IHEAT.EQ.1.AND.ICOMP.EQ.MCOMPT) CNAME = ANAME(16)
       IF(IDPIN.EQ.0) THEN !--------------------------------SINGLE PRECISION READ
       DO K=1,NLAY
         NNDLAY = NODLAY(K)
@@ -612,25 +641,31 @@ C-----------------------------------------------------------------------
 C14-----PREPARE ARRAYS OF PARAMETERS
 C-----------------------------------------------------------------------
 C15-----MULTIPLY DUAL DOMAIN RATE TERM BY VOLUME OF GRID BLOCK TO GIVE TOTAL TRANSFER FOR CELL
-      CALL SGWF2LPFU1SC(DDTTR(1),1)
+      IF(ISD_MASS_TR.EQ.0) THEN
+        CALL SGWF2LPFU1SC(DDTTR(1),1)
+      ELSE
+        DO ICOMP = 1, MCOMPT
+          CALL SGWF2LPFU1SC(DDTTRSD(1,ICOMP),1)
+        ENDDO
+      ENDIF
 C
 C-----------------------------------------------------------------------
-C16-----IF FLOW IS DUAL POROSITY THEN CONDUCTANCE AND STORAGE TERMS ARE ADJUSTED IN DPT. OTHERWISE, 
+C16-----IF FLOW IS DUAL POROSITY THEN CONDUCTANCE AND STORAGE TERMS ARE ADJUSTED IN DPT. OTHERWISE,
 C ------ADJUST CONDUCTANCE AND STORAGE HERE, IF ALSO IFRAHK=1 (PROPERTIES WERE INPUT FOR FRACTURE DOMAIN)
       IF(IDPF.EQ.0)THEN
 C16B-----SCALE STORAGE COEFFICIENTS BY MOBILE FRACTION IF TRANSIENT FLOW
         ITISTR = 0
         DO NPE=1,NPER
-          IF(ISSFLG(NPE).EQ.0) THEN 
-            ITISTR = 1  
+          IF(ISSFLG(NPE).EQ.0) THEN
+            ITISTR = 1
             GO TO 123
-          ENDIF  
-        ENDDO    
+          ENDIF
+        ENDDO
  123    CONTINUE
-C          
-        IF(ITISTR.EQ.0) GO TO 211  
-C --------SCALE SC1 AND SC2 ONLY IF IFRAHK = 1 AND GIVEN FOR FRACTURE WHERE FLOW OCCURS        
-        IF(IFRAHK.EQ.1)THEN 
+C
+        IF(ITISTR.EQ.0) GO TO 211
+C --------SCALE SC1 AND SC2 ONLY IF IFRAHK = 1 AND GIVEN FOR FRACTURE WHERE FLOW OCCURS
+        IF(IFRAHK.EQ.1)THEN
         DO N=1,NODES
           SC1(N) = SC1(N) * PHIF(N)
         ENDDO
@@ -639,7 +674,7 @@ C --------SCALE SC1 AND SC2 ONLY IF IFRAHK = 1 AND GIVEN FOR FRACTURE WHERE FLOW
           IF(LAYCON(K).NE.0)THEN
             NCNVRT=1
           ENDIF
-        ENDDO  
+        ENDDO
         IF(NCNVRT.GT.0)THEN
           DO N=1,NODES
             SC2(N) = SC2(N) * PHIF(N)
@@ -653,42 +688,42 @@ C            ALLOCATE(SC2IM(NODES))
 C            DO N=1,NODES
 C              SC2IM(N) = 0.0
 C            ENDDO
-          ENDIF  
+          ENDIF
         ENDIF
         ELSE
-C4B ----SPECIFIC YIELD IS FOR TOTAL DOMAIN AND EFFECTIVE POROSITY IS FOR FRACTURE 
-C4B-----CHECK FOR ERRORS, POROSITY CANNOT BE LESS THAN SPECIFIC YIELD IN FRACTURE 
+C4B ----SPECIFIC YIELD IS FOR TOTAL DOMAIN AND EFFECTIVE POROSITY IS FOR FRACTURE
+C4B-----CHECK FOR ERRORS, POROSITY CANNOT BE LESS THAN SPECIFIC YIELD IN FRACTURE
         IEFFPOR = 0
         DO K = 1,NLAY
         NNDLAY = NODLAY(K)
         NSTRT = NODLAY(K-1)+1
         NDSLAY = NNDLAY - NODLAY(K-1)
-        DO N = NSTRT,NNDLAY 
+        DO N = NSTRT,NNDLAY
           IF(LAYCON(K).NE.3.AND.LAYCON(K).NE.2.AND.LAYCON(K).NE.4
      1       .AND.LAYCON(K).NE.5)GO TO 90
           IF(ICBUND(N).EQ.0.OR.IBOUND(N).EQ.0)GO TO 90
           SYIF = SC2(N)/AREA(N) / PHIF(N)
           IF(PRSITY(N)+1.e-5.LT.SYIF) THEN
-              PRSITY(N) = SYIF+1.e-5 
+              PRSITY(N) = SYIF+1.e-5
               IEFFPOR = 1
-c            WRITE(IOUT,56) N, PRSITY(N),SC2(N)/AREA(N),PHIF(N) 
+c            WRITE(IOUT,56) N, PRSITY(N),SC2(N)/AREA(N),PHIF(N)
 c56          FORMAT(5X,'*** Porosity * phif < Sy FOR NODE: ',I10,' ***'/
-c     1      9X,'POROSITY IS ',G10.4,' SC2 IS',G10.4,' PHIF IS',G10.4)  
+c     1      9X,'POROSITY IS ',G10.4,' SC2 IS',G10.4,' PHIF IS',G10.4)
 c            STOP
           ENDIF
 90        CONTINUE
-        ENDDO  
         ENDDO
-        IF(IEFFPOR.EQ.1) THEN 
-          WRITE(IOUT,57) 
+        ENDDO
+        IF(IEFFPOR.EQ.1) THEN
+          WRITE(IOUT,57)
 57        FORMAT(5X,'*** EFFECTIVE POROSITY INPUT IS ASSUMED TO BE FOR',
      1    1X,'TOTAL DOMAIN AND IS SCALED FOR FRACTURE DOMAIN ***' /
      2    9X,'POROSITY OF FRACURE HAS TO BE LARGER THAN ITS SPECIFIC',
      2    1X,'YIELD WHICH WAS INPUT FOR TOTAL DOMAIN (IFRACHK = 0)')
-        ENDIF    
         ENDIF
-  211   CONTINUE   
-C16C----SCALE CONDUCTIVITY IF PROVIDED FOR FRACTURES ONLY 
+        ENDIF
+  211   CONTINUE
+C16C----SCALE CONDUCTIVITY IF PROVIDED FOR FRACTURES ONLY
         IF(IFRAHK.EQ.1) THEN
         DO K=1,NLAY
           NNDLAY = NODLAY(K)
@@ -709,8 +744,8 @@ C3--------------only for upper triangle of porous medium nodes
           HK(N) = HK(N) * PHIF(N)
         ENDDO
         ENDIF
-      ENDIF  
-C-----------------------------------------------------------------------      
+      ENDIF
+C-----------------------------------------------------------------------
 C17----FOR ZERO ORDER DECAY IN WATER
       IF(IZOD.EQ.1.OR.IZOD.EQ.3.OR.IZOD.EQ.4)THEN
         DO ICOMP = 1,MCOMP
@@ -725,7 +760,7 @@ C17----FOR ZERO ORDER DECAY IN WATER
           ZODRWIM(N,ICOMP)=ZODRWIM(N,ICOMP)*PRSITYIM(N)*(1.0 - PHIF(N))
         ENDDO
         ENDDO
-      ENDIF      
+      ENDIF
 C18----FOR ZERO ORDER DECAY IN SOIL ** DOES NOT NEED PHIF SINCE ADSORB TERM HAS IT FOR M AND IM
 C      IF((IZOD.EQ.2.OR.IZOD.EQ.3).AND.IADSORB.NE.0)THEN
 C        DO ICOMP = 1,MCOMP
@@ -751,14 +786,14 @@ C19----FOR FIRST ORDER DECAY IN WATER
         ENDDO
         ENDDO
       ENDIF
-      IF(IFODIM.EQ.1.OR.IFODIM.EQ.3.OR.IFOD.EQ.4)THEN
+      IF(IFODIM.EQ.1.OR.IFODIM.EQ.3.OR.IFODIM.EQ.4)THEN
         DO ICOMP = 1,MCOMP
         DO N = 1,NODES
           FODRWIM(N,ICOMP)=FODRWIM(N,ICOMP)*PRSITYIM(N)*(1.0 - PHIF(N))
         ENDDO
         ENDDO
-      ENDIF      
-C20----FOR FIRST ORDER DECAY ON SOIL ** DOES NOT NEED PHIF SINCE ADSORB TERM HAS IT FOR M AND IM 
+      ENDIF
+C20----FOR FIRST ORDER DECAY ON SOIL ** DOES NOT NEED PHIF SINCE ADSORB TERM HAS IT FOR M AND IM
 C      IF((IFOD.EQ.2.OR.IFOD.EQ.3).AND.IADSORB.NE.0)THEN
 C        DO ICOMP = 1,MCOMP
 C        DO N = 1,NODES
@@ -786,14 +821,14 @@ C22----FOR KD VALUES ON SOIL
           ADSORBIM(N,ICOMP) = ADSORBIM(N,ICOMP) * (1.0 - PHIF(N))
         ENDDO
         ENDDO
-      ENDIF      
+      ENDIF
 C  ---------------------------------------------------------------------
 C10------RETURN
       RETURN
       END
 C
 C-----------------------------------------------------------------------
-      SUBROUTINE INITMASSIM 
+      SUBROUTINE INITMASSIM
 C     ******************************************************************
 C      COMPUTE THE INITIAL MASS OF IMMOBILE COMPONENTS
 C     ******************************************************************
@@ -802,19 +837,19 @@ C        SPECIFICATIONS:
 C     ------------------------------------------------------------------
       USE GLOBAL, ONLY:IOUT,NODES,IDPT,IDPF,TOP,BOT,AREA,ISSFLG,IDPF
       USE GWTDPTMODULE
-      USE GWTBCTMODULE, ONLY: MCOMP,ICBUND,CINACT,
+      USE GWTBCTMODULE, ONLY: MCOMP,MCOMPT,NTCOMP,IHEAT,ICBUND,CINACT,
      1    ISOLUBILITY,SOLLIM,SOLSLOPE
       USE GWFDPFMODULE, ONLY: PHIF,SoIM,SC1IM,SC2IM,HOLDIM
       USE AW_ADSORBIMMODULE, ONLY: AK_AWIIM, AREA_AWIIM
       DOUBLE PRECISION MASLOCW,MASLOCS,MASLOCC,REFHD,MASLOPR,MASLOAWIIM
 C     --------------------------------------------------------------------
-C1-----COMPUTE MASS FOR MOBILE COMPONENTS OF IMMOBILE DOMAIN
+C1-----COMPUTE MASS FOR ALL COMPONENTS IN IMMOBILE DOMAIN
       WRITE(IOUT,12)
 12    FORMAT(/5X,'IN IMMOBILE DOMAIN'/
      *        5X,'------------------'/
      *       5X,'COMPONENT INDEX',5X,'MASS'/
      *       5X,'---------------',5X,'----')
-      DO ICOMP = 1,MCOMP
+      DO ICOMP = 1,NTCOMP
         MASSBCTIM (ICOMP) = 0.0
       ENDDO
       MASLOCW = 0.0
@@ -823,22 +858,31 @@ C1-----COMPUTE MASS FOR MOBILE COMPONENTS OF IMMOBILE DOMAIN
       MASLOPR = 0.0
       MASLOAWIIM = 0.0
       ISS=ISSFLG(1)
-C1A-------INITIALIZE A-W SURFACE AREA AND K_AW       
-      IF(IAW_ADSORBIM.EQ.1)THEN       
+C1A-------INITIALIZE A-W SURFACE AREA AND K_AW
+      IF(IAW_ADSORBIM.EQ.1)THEN
         CALL AWI_AREAIM
         DO ICOMP = 1,MCOMP
-          CALL AWI_GETKAWIIM(ICOMP)      
-        ENDDO  
-      ENDIF        
+          CALL AWI_GETKAWIIM(ICOMP)
+        ENDDO
+      ENDIF
 C2-----COMPUTE MASS FOR EACH ACTIVE NODE
       DO N = 1,NODES
         IF(ICBUNDIM(N).EQ.0) CYCLE
 C3-------COMPUTE VOLUME OF NODE
         ALENG = TOP(N) - BOT(N)
         VOLU = AREA(N) * ALENG
-C4-------FOR EACH COMPONENT
-        DO ICOMP = 1,MCOMP
-C5-------COMPUTE MASS IN WATER
+C4-------FOR EACH COMPONENT (MOBILE, TEMPERATURE, THEN IMMOBILE)
+        DO ICOMP = 1,NTCOMP
+C4A-------IMMOBILE COMPONENTS: MASS IN TOTAL MATRIX VOLUME ONLY
+          IF(ICOMP.GT.MCOMPT)THEN
+            MASSBCTIM(ICOMP) = MASSBCTIM(ICOMP)
+     1        + CONCIM(N,ICOMP) * VOLU
+            CYCLE
+          ENDIF
+C5-------COMPUTE MASS IN WATER (MOBILE SOLUTES AND TEMPERATURE)
+          MASLOCS = 0.0
+          MASLOCC = 0.0
+          MASLOAWIIM = 0.0
           IF(ISS.EQ.1.OR.IDPF.EQ.0)THEN
             MASLOCW = PRSITYIM(N) * SoIM(N) * CONCIM(N,ICOMP) * VOLU
           ELSE
@@ -852,36 +896,37 @@ C7-----------INITIAL MASS IN COMPRESSIBLE STORAGE ASSUMED FROM TOP OF CELL
           ENDIF
 C8---------COMPUTE MASS ON SOIL
           IF(IADSORBIM.EQ.1)THEN  ! LINEAR
-            MASLOCC = ADSORBIM(N,ICOMP) * CONCIM(N,ICOMP) * VOLU  
-          ELSEIF(IADSORBIM.EQ.2)THEN ! FREUNDLICH    
+            MASLOCC = ADSORBIM(N,ICOMP) * CONCIM(N,ICOMP) * VOLU
+          ELSEIF(IADSORBIM.EQ.2)THEN ! FREUNDLICH
             ETA = FLICHIM(N,ICOMP)
             MASLOCC = ADSORBIM(N,ICOMP) * CONCIM(N,ICOMP)**ETA * VOLU
-          ELSEIF(IADSORBIM.EQ.3)THEN ! FREUNDLICH    
+          ELSEIF(IADSORBIM.EQ.3)THEN ! FREUNDLICH
             ETA = FLICHIM(N,ICOMP)
-            MASLOCC = ADSORBIM(N,ICOMP) * VOLU * * CONCIM(N,ICOMP)
+            MASLOCC = ADSORBIM(N,ICOMP) * VOLU * CONCIM(N,ICOMP)
             MASLOCC = MASLOCC / (1.0 + ETA * CONCIM(N,ICOMP))
           ENDIF
-C9-----------COMPUTE MASS ON AIR-WATER INTERFACE
-          IF(IAW_ADSORBIM.EQ.1)THEN   
+C9-----------COMPUTE MASS ON AIR-WATER INTERFACE (MOBILE SOLUTES ONLY)
+          IF(IAW_ADSORBIM.EQ.1.AND.ICOMP.LE.MCOMP)THEN
             MASLOAWIIM= AREA_AWIIM(N)* AK_AWIIM(N,ICOMP)
      1        *CONCIM(N,ICOMP)* VOLU
           ENDIF
 C10-----------COMPUTE MASS PRECIPITATED ABOVE SOLUBILITY LIMIT
-          IF(ISOLUBILITY.NE.0)THEN 
-            MASLOPR = 0.0
+C10-----------(MOBILE SOLUTES ONLY - NOT TEMPERATURE OR IMMOBILE COMPONENTS)
+          MASLOPR = 0.0
+          IF(ISOLUBILITY.NE.0.AND.ICOMP.LE.MCOMP)THEN
             CW = CONCIM(N,ICOMP)
             SLIM = SOLLIM(ICOMP)
             SSLOPE = SOLSLOPE(ICOMP)
-            IF(CW.GT.SLIM) MASLOPR = (CW-SLIM) * SSLOPE              
+            IF(CW.GT.SLIM) MASLOPR = (CW-SLIM) * SSLOPE
             MASLOPR =  MASLOPR * VOLU
-          ENDIF                      
-C 11----------ADD UP ALL TERMS 
-          MASSBCTIM(ICOMP) = MASSBCTIM(ICOMP)+MASLOCW+MASLOCS+MASLOCC 
-     *     + MASLOPR  + MASLOAWIIM   
+          ENDIF
+C 11----------ADD UP ALL TERMS
+          MASSBCTIM(ICOMP) = MASSBCTIM(ICOMP)+MASLOCW+MASLOCS+MASLOCC
+     *     + MASLOPR  + MASLOAWIIM
         ENDDO
       ENDDO
 C11-----WRITE MASS TO OUTPUT FILE
-      DO ICOMP = 1,MCOMP
+      DO ICOMP = 1,NTCOMP
         WRITE(IOUT,13) ICOMP, MASSBCTIM(ICOMP)
       ENDDO
 13    FORMAT(I15,5X,E15.6)
@@ -930,13 +975,13 @@ C-----------------------------------------------------------------------------
           IF(ICBUNDIM(N).EQ.0) CYCLE
           CALL GWT2DPT1STOIM(N,ICOMP,DIAGS,RTERMS,ISS)
           DIADDT(N)=DIADDT(N) + DIAGS
-          RDDT(N)=RDDT(N) + RTERMS 
+          RDDT(N)=RDDT(N) + RTERMS
   140   CONTINUE
 200   CONTINUE
 C-----------------------------------------------------------------------------
 C2------FILL DECAY TERM ON DIAGONAL AND RHS OF IMMOBILE DOMAIN EQUATION
 C-----------------------------------------------------------------------------
-      IF(IHEAT.EQ.1. AND. ICOMP.GE.MCOMPT) GO TO 52 ! NO DECAY FOR HEAT OR IMMOBILE COMPONENTS     
+      IF(IHEAT.EQ.1. AND. ICOMP.EQ.MCOMPT) GO TO 52 ! NO DECAY FOR HEAT ONLY; IMMOBILE COMPONENTS DECAY IN IMMOBILE DOMAIN
       DO 201 K=1,NLAY
         NNDLAY = NODLAY(K)
         NSTRT = NODLAY(K-1)+1
@@ -948,35 +993,35 @@ C-----------------------------------------------------------------------------
           RDDT(N)=RDDT(N) + RTERMD
   141   CONTINUE
 201   CONTINUE
-52    CONTINUE      
+52    CONTINUE
 C-----------------------------------------------------------------------
 C5I---------FILL PARENT GENERATION TERMS ON RHS
       IF(ICHAIN.NE.0) THEN
-        IF(IHEAT.EQ.1. AND. ICOMP.EQ.MCOMPT) GO TO 53 ! NO GENERATION FOR HEAT FROM COMPONENT DECAY         
+        IF(IHEAT.EQ.1. AND. ICOMP.EQ.MCOMPT) GO TO 53 ! NO GENERATION FOR HEAT FROM COMPONENT DECAY
         DO N=1,NODES
           IF(ICBUNDIM(N).NE.0)THEN
             CALL GWT2BCT1GENIM(N,ICOMP)
           ENDIF
         ENDDO
-53      CONTINUE        
-      ENDIF     
+53      CONTINUE
+      ENDIF
 C-----------------------------------------------------------------------
-C5J---------FILL SOLUBILITY PRECIPITATION TERMS 
-      IF(ISOLUBILITY.NE.0) THEN
+C5J---------FILL SOLUBILITY PRECIPITATION TERMS (MOBILE SOLUTES ONLY)
+      IF(ISOLUBILITY.NE.0.AND.ICOMP.LE.MCOMPT) THEN
         IF(IHEAT.EQ.1. AND. ICOMP.EQ.MCOMPT) GO TO 54
         DO N=1,NODES
           IF(ICBUNDIM(N).NE.0)THEN
             CALL SOLUBILITYIM(N,ICOMP,DTERMS,RTERMS,ISS)
             DIADDT(N) = DIADDT(N) + DTERMS
-            RDDT(N) = RDDT(N) + RTERMS            
+            RDDT(N) = RDDT(N) + RTERMS
           ENDIF
         ENDDO
 54      CONTINUE
-      ENDIF           
+      ENDIF
 C----------------------------------------------------------------------
 C5K-------FILL PARTITION TERM FOR AIR-WATER INTERFACE IF ADSORPTION ON INTERFACE
         IF(IAW_ADSORBIM.EQ.1)THEN
-          IF(IHEAT.EQ.1. AND. ICOMP.GE.MCOMPT) GO TO 55
+          IF(ICOMP.GT.MCOMP) GO TO 55 ! AWI (AIR-WATER INTERFACE) ADSORPTION APPLIES TO MOBILE SOLUTES ONLY (EXCLUDES HEAT AND IMMOBILE)
           CALL AWI_KAWIIM (ICOMP)
 55        CONTINUE
         ENDIF
@@ -984,6 +1029,10 @@ C
 C-----------------------------------------------------------------------------
 C5------FILL ADVECTIVE/DISPERSIVE MASS TRANSFER TERM ON OFF-DIAGONALS AND DIAGONALS
 C-----------------------------------------------------------------------------
+C-------SKIP ALL MOBILE<->IMMOBILE MASS TRANSFER FOR IMMOBILE COMPONENTS
+C-------(ICOMP > MCOMPT): THEY DO NOT TRANSFER BETWEEN DOMAINS SO THEIR
+C-------IMMOBILE-DOMAIN EQUATION IS PURELY LOCAL (STORAGE/DECAY/GENERATION)
+      IF(ICOMP.GT.MCOMPT) GO TO 301
       IF(IDPF.NE.0) THEN  !DUAL POROSITY FLOW
         DO 220 N = 1, NODES
           IF(ICBUNDIM(N).EQ.0) CYCLE
@@ -1009,7 +1058,11 @@ C-----------------------------------------------------------------------------
 C6-------NON-CONVERTIBLE LAYER, SO COPY CONSTANT TERM TO OFF-DIAGONALS AND ADD TO DIAGONALS
           DO 240 N=NSTRT,NNDLAY
             IF(ICBUNDIM(N).NE.0.AND.ICBUND(N).NE.0) THEN
-              DDFLOW = DDTTR(N)
+              IF(ISD_MASS_TR.EQ.1) THEN
+                DDFLOW = DDTTRSD(N,ICOMP)
+              ELSE
+                DDFLOW = DDTTR(N)
+              ENDIF
               OFFDDTM(N) = OFFDDTM(N) + DDFLOW
               OFFDDTIM(N) = OFFDDTIM(N) + DDFLOW
               AMAT(IA(N)) =  AMAT(IA(N)) - DDFLOW
@@ -1032,7 +1085,11 @@ C8B-------------IMMOBILE DOMAIN IS UPSTREAM
             ENDIF
 C
 C9--------------FILL NONLINEAR TERMS IN OFF-DIAGONALS AND ADD TO DIAGONALS
-            DDFLOW = DDTTR(N) * UPSAT
+            IF(ISD_MASS_TR.EQ.1) THEN
+              DDFLOW = DDTTRSD(N,ICOMP) * UPSAT
+            ELSE
+              DDFLOW = DDTTR(N) * UPSAT
+            ENDIF
             OFFDDTM(N) = OFFDDTM(N) + DDFLOW
             OFFDDTIM(N) = OFFDDTIM(N) + DDFLOW
             AMAT(IA(N)) =  AMAT(IA(N)) - DDFLOW
@@ -1040,6 +1097,7 @@ C9--------------FILL NONLINEAR TERMS IN OFF-DIAGONALS AND ADD TO DIAGONALS
 250       CONTINUE
         ENDIF
 300   CONTINUE
+301   CONTINUE
       itestmat = 0
       if(itestmat.eq.1)then
 c        open(99,file='mat_USGs.TXT')
@@ -1052,7 +1110,7 @@ c66      FORMAT(I9,1X,G15.3,2X,100G15.3)
 66      FORMAT(I9,1X,G15.4,2X,100G15.4)
         CLOSE (99)
         stop
-      endif      
+      endif
 C
 C11------RETURN
       RETURN
@@ -1095,7 +1153,7 @@ C-------ADD STORAGE TERMS ON SOIL
         IF(N.LE.NODES.AND.IADSORBIM.EQ.2) IFILLADS = 2
         IF(N.LE.NODES.AND.IADSORBIM.EQ.3) IFILLADS = 3
         IF(N.GT.NODES) IFILLADS = 0
-C          
+C
         IF(IFILLADS.EQ.1)THEN
 C---------LINEAR ISOTHERM
           ADSTERM = ADSORBIM(N,ICOMP) * VODT
@@ -1113,16 +1171,16 @@ C---------NONLINEAR ISOTHERM FILLED AS MODIFIED PICARD
           DT = 0.0
           RT = 0.0
           IF(IFILLADS.EQ.2)THEN
-            RT = CW**FL - CWO**FL 
-            RT = RT * ADSTERM 
+            RT = CW**FL - CWO**FL
+            RT = RT * ADSTERM
             if( fl.lt.1.0 .and. cw. lt. 1.e-7) cw = 1e-7        !No NWT term if/when slope approaches infinity
             DT = ADSTERM*FL * CW**(FL - 1.0)
           ELSEIF(IFILLADS.EQ.3) THEN
             RT = CW/(1.0 + FL*CW) - CWO/(1.0 + FL*CWO)
             RT = RT *ADSTERM
             DT = (1+FL*CW)*ADSTERM - ADSTERM*CW*FL ! ANALYTIC DERIV OF U/V = (VdU - UdV)/V^2
-            DT = DT / (1.0 + FL*CW)**2  
-          ENDIF    
+            DT = DT / (1.0 + FL*CW)**2
+          ENDIF
           DTERMS = DTERMS - DT
           RTERMS = RTERMS - DT * CW + RT
         ENDIF
@@ -1153,20 +1211,29 @@ C     ------------------------------------------------------------------
       USE GWFBASMODULE,ONLY:DELT
       USE GWFBCFMODULE,ONLY:LAYCON
       USE GWTBCTMODULE, ONLY: MCOMP,CONC,CONCO,ICT,IADSORB,PRSITY,
-     * ADSORB
+     * ADSORB,MCOMPT,NTCOMP
       USE GWFDPFMODULE, ONLY: PHIF,SnIM,SoIM,SC1IM,SC2IM,HNEWIM,HOLDIM
       USE GWTDPTMODULE, ONLY: CONCIM,CONCOIM,IADSORBIM,PRSITYIM,
      * ADSORBIM
       DOUBLE PRECISION VODT,ADSTERM,CW,FL,CWO,DT,RT,ALENG,VOLU,
-     1  X,Y,EPSS,EPS,CT,CEPS,QA,QEPS,DQ,OMP,DTERMS,RTERMS,SATN,SATO
+     1  X,Y,EPSS,EPS,CT,CEPS,QA,QEPS,DQ,OMP,DTERMS,RTERMS,SATN,SATO,
+     1  PRSITYIMTMP
 C-------------------------------------------------------------------------------------
       SATN = SnIM(N)
       SATO = SoIM(N)
       if(satn.lt.1.0e-3) satn = 1.0e-3
-      if(sato.lt.1.0e-3) sato = 1.0e-3      
+      if(sato.lt.1.0e-3) sato = 1.0e-3
+      PRSITYIMTMP = PRSITYIM(N)
+C.......STORAGE FOR IMMOBILE COMPONENTS IS PER UNIT TOTAL VOLUME (NOT DISSOLVED CONC)
+      IF(ICOMP.GT.MCOMPT) THEN
+        PRSITYIMTMP = 1.0
+        SATN = 1.0
+        SATO = 1.0
+      ENDIF        
+C          
       IF(ISS.EQ.1.OR.N.GT.NODES.OR.IDPF.EQ.0) THEN
 C-------USE TRADITIONAL STORAGE TERM FOR CLN DOMAIN OR SS FLOW
-        IF(N.LE.NODES) VODT = VODT * PRSITYIM(N)
+        IF(N.LE.NODES) VODT = VODT * PRSITYIMTMP
         DTERMS = DTERMS - VODT * SATN
         RTERMS = RTERMS - VODT * SATO * CONCOIM(N,ICOMP)
       ELSE
@@ -1175,39 +1242,39 @@ C-------USE TRADITIONAL STORAGE TERM FOR CLN DOMAIN OR SS FLOW
         IF(LC.EQ.4.OR.LC.EQ.5)THEN !
 C---------TWO STORAGES FOR UPSTREAM WEIGHTING FORMULATION
           DTERMS = DTERMS -
-     *      ((PRSITYIM(N)*VOLU-SC2IM(N)*ALENG) + ALENG*SC2IM(N)*SATN
+     *      ((PRSITYIMTMP*VOLU-SC2IM(N)*ALENG) + ALENG*SC2IM(N)*SATN
      *      +SATN*SC1IM(N)*(HNEWIM(N)-HOLDIM(N))) / DELT
           RTERMS = RTERMS -
-     *      ((PRSITYIM(N)*VOLU-SC2IM(N)*ALENG) + ALENG*SC2IM(N)*SATO)
+     *      ((PRSITYIMTMP*VOLU-SC2IM(N)*ALENG) + ALENG*SC2IM(N)*SATO)
      *       * CONCOIM(N,ICOMP) / DELT
         ELSEIF(LC.EQ.0.OR.LC.EQ.2) THEN
 C---------ONE CONFINED STORAGE CAPACITY FOR FLOW
-            DTERMS = DTERMS - (PRSITYIM(N)*VOLU+SC1IM(N)*
+            DTERMS = DTERMS - (PRSITYIMTMP*VOLU+SC1IM(N)*
      *       (HNEWIM(N)-HOLDIM(N)))/DELT
-            RTERMS = RTERMS - (PRSITYIM(N)*VOLU)/DELT
+            RTERMS = RTERMS - (PRSITYIMTMP*VOLU)/DELT
      *       * CONCOIM(N,ICOMP)
         ELSEIF(LC.EQ.1) THEN ! IN BCF, IF LAYCON = 1, THE SPECIRFIC YIELD IS READ IN SC2 ?
 C---------ONE UNCONFINED STORAGE CAPACITY FOR FLOW
           DTERMS = DTERMS -
-     *   ((PRSITYIM(N)*VOLU-SC2IM(N)*ALENG)+SC2IM(N)*ALENG*SATN)/DELT
+     *   ((PRSITYIMTMP*VOLU-SC2IM(N)*ALENG)+SC2IM(N)*ALENG*SATN)/DELT
           RTERMS = RTERMS -
-     *   ((PRSITYIM(N)*VOLU-SC2IM(N)*ALENG)+SC2IM(N)*ALENG*SATO)/DELT
+     *   ((PRSITYIMTMP*VOLU-SC2IM(N)*ALENG)+SC2IM(N)*ALENG*SATO)/DELT
      *     * CONCOIM(N,ICOMP)
         ELSEIF(LC.EQ.3) THEN
 C---------TWO STORAGE CAPACITIES FOR FLOW
           TP=TOP(N)
           IF(HOLDIM(N).GT.TP.AND.HNEWIM(N).GT.TP) THEN
 C-----------CELL IS CONFINED
-            DTERMS = DTERMS - (PRSITYIM(N)*VOLU+SC1IM(N)*
+            DTERMS = DTERMS - (PRSITYIMTMP*VOLU+SC1IM(N)*
      *       (HNEWIM(N)-HOLDIM(N)))/DELT
-            RTERMS = RTERMS - (PRSITYIM(N)*VOLU)/DELT
+            RTERMS = RTERMS - (PRSITYIMTMP*VOLU)/DELT
      *       * CONCOIM(N,ICOMP)
           ELSEIF (HOLDIM(N).LT.TP.AND.HNEWIM(N).LT.TP) THEN
 C-----------CELL IS UNCONFINED
             DTERMS = DTERMS -
-     *   ((PRSITYIM(N)*VOLU-SC2IM(N)*ALENG)+SC2IM(N)*ALENG*SATN)/DELT
+     *   ((PRSITYIMTMP*VOLU-SC2IM(N)*ALENG)+SC2IM(N)*ALENG*SATN)/DELT
             RTERMS = RTERMS -
-     *   ((PRSITYIM(N)*VOLU-SC2IM(N)*ALENG)+SC2IM(N)*ALENG*SATO)/DELT
+     *   ((PRSITYIMTMP*VOLU-SC2IM(N)*ALENG)+SC2IM(N)*ALENG*SATO)/DELT
      *     * CONCOIM(N,ICOMP)
           ELSE
 C-----------CELL HAS CONVERTED THIS TIME STEP
@@ -1220,9 +1287,9 @@ C-------------WLEs LOWERED - BECOMES UNCONFINED
               H1 = TP
               H2 = HOLDIM(N)
             ENDIF
-            DTERMS = DTERMS - ((PRSITYIM(N)*VOLU-SC2IM(N)*ALENG) +
+            DTERMS = DTERMS - ((PRSITYIMTMP*VOLU-SC2IM(N)*ALENG) +
      *       SC2IM(N)*ALENG*SATN + SC1IM(N)*(H1-H2)) / DELT
-            RTERMS = RTERMS - ((PRSITYIM(N)*VOLU-SC2IM(N)*ALENG) +
+            RTERMS = RTERMS - ((PRSITYIMTMP*VOLU-SC2IM(N)*ALENG) +
      *       SC2IM(N)*ALENG*SATO) / DELT
      *       * CONCOIM(N,ICOMP)
           ENDIF
@@ -1295,23 +1362,23 @@ C--------------FOR NON-LINEAR ADSORPTION FILL AS NEWTON
               IF(IADSORBIM.EQ.2) THEN
                 QA =  CT * CONCIM(N,ICOMP) ** ETA
               ELSEIF(IADSORBIM.EQ.3) THEN
-                QA =  CT * CONCIM(N,ICOMP) / (1.0+ETA*CONCIM(N,ICOMP))  
-              ENDIF    
+                QA =  CT * CONCIM(N,ICOMP) / (1.0+ETA*CONCIM(N,ICOMP))
+              ENDIF
 C--------------CALCULATE DQ/DH
               EPSS = 0.00001
               CEPS = CONCIM(N,ICOMP)+EPSS
               IF(IADSORBIM.EQ.2) THEN
                 QEPS = CT * CEPS ** ETA
               ELSEIF(IADSORBIM.EQ.3) THEN
-                QEPS =  CT * CEPS / (1.0 + ETA*CEPS)  
-              ENDIF   
+                QEPS =  CT * CEPS / (1.0 + ETA*CEPS)
+              ENDIF
               DQ = (QEPS - QA) / EPSS
               DTERMD = DTERMD + DQ
               RTERMD = RTERMD - QA + DQ*CONCIM(N,ICOMP)
             ENDIF
           ENDIF
-C --------DECAY ON AIR-WATER INTERFACE ADSORBED SOLUTES          
-          IF(IAW_ADSORBIM.NE.0) 
+C --------DECAY ON AIR-WATER INTERFACE ADSORBED SOLUTES
+          IF(IAW_ADSORBIM.NE.0)
      *      CALL GWT2DPT1DCYAWIM(N,ICOMP,DTERMD,RTERMD,VOLU)
         ENDIF
 C-----------------------------------------------------------------------
@@ -1367,8 +1434,8 @@ C     ------------------------------------------------------------------
      1  ZODRS,FODRS,ICHAIN,NPARENT,JPARENT,STOTIO,ISPRCT
       USE GWTDPTMODULE, ONLY: CONCIM,CONCOIM,IADSORBIM,PRSITYIM,
      * ADSORBIM,FLICHIM,IZODIM,IFODIM,ZODRWIM,FODRWIM,
-     1  ZODRSIM,FODRSIM, SPTLRCTIM, IAW_ADSORBIM     
-      USE GWFDPFMODULE, ONLY: PHIF,SnIM,SoIM      
+     1  ZODRSIM,FODRSIM, SPTLRCTIM, IAW_ADSORBIM
+      USE GWFDPFMODULE, ONLY: PHIF,SnIM,SoIM
       DOUBLE PRECISION ADSTERM,CW,FL,CWO,DT,RT,ALENG,VOLU,
      1  X,Y,EPSS,EPS,CT,CEPS,QA,QEPS,DQ,OMP,DTERMD,RTERMD
 C     ------------------------------------------------------------------
@@ -1386,11 +1453,11 @@ C ------ DO FOR ALL PARENTS OF COMPONENT ICOMP IF IT HAS PARENTS
         DTERMD = 0.0
         RTERMD = 0.0
         IPAREN = JPARENT(ICOMP,NPAREN)
-        IF(ISPRCT.EQ.0)THEN 
+        IF(ISPRCT.EQ.0)THEN
           STOIT  = STOTIO(ICOMP,NPAREN)
         ELSE
           STOIT = SPTLRCTIM(N,ICOMP,NPAREN)
-        ENDIF        
+        ENDIF
 C----------------------------------------------------------------------
       IF(ICT.EQ.0)THEN  !----------WATER PHASE CONCENTRATION FORMULATION
 C2-------GENERATION TERMS ON SOIL (NO ADSORPTION ON CLN)
@@ -1427,23 +1494,23 @@ C--------------FOR NON-LINEAR ADSORPTION FILL AS NEWTON
                 QA =  CT * CONCIM(N,IPAREN) ** ETA
               ELSEIF(IADSORBIM.EQ.3) THEN
                 QA =  CT * CONCIM(N,IPAREN) / (1.0+ETA*CONCIM(N,IPAREN))
-              ENDIF    
+              ENDIF
 C--------------CALCULATE DQ/DH
               EPSS = 0.00001
               CEPS = CONCIM(N,IPAREN)+EPSS
               IF(IADSORBIM.EQ.2) THEN
                 QEPS = CT * CEPS ** ETA
               ELSEIF(IADSORBIM.EQ.3) THEN
-                QEPS =  CT * CEPS / (1.0 + ETA*CEPS)  
-              ENDIF   
+                QEPS =  CT * CEPS / (1.0 + ETA*CEPS)
+              ENDIF
               DQ = (QEPS - QA) / EPSS
               DTERMD = DTERMD + DQ
-              RTERMD = RTERMD - QA + DQ*CONCIM(N,IPAREN)              
+              RTERMD = RTERMD - QA + DQ*CONCIM(N,IPAREN)
             ENDIF
           ENDIF
-C --------GENERATION ON AIR-WATER INTERFACE ADSORBED SOLUTES            
-          IF(IAW_ADSORBIM.NE.0)          
-     *      CALL GWT2DPT1GENAWIM(N,ICOMP,DTERMD,RTERMD,VOLU,NPAREN) 
+C --------GENERATION ON AIR-WATER INTERFACE ADSORBED SOLUTES
+          IF(IAW_ADSORBIM.NE.0)
+     *      CALL GWT2DPT1GENAWIM(N,ICOMP,DTERMD,RTERMD,VOLU,NPAREN)
         ENDIF
 C-----------------------------------------------------------------------
 C7---------ZERO ORDER DECAY IN WATER - APPLY NEWTON EXPANSION OF SUPPLY-DEMAND FUNCTION
@@ -1629,7 +1696,7 @@ C
       CHARACTER*16 TEXT
       DOUBLE PRECISION RATIN,RATOUT,QQ,VODT,ADSTERM,FL,CW,CWO,ALENG,
      *  DTERMS,RTERMS,VOLU
-      DATA TEXT /'IM ADSORBED MASS'/ 
+      DATA TEXT /'IM ADSORBED MASS'/
 C     ------------------------------------------------------------------
 C
 C1------CLEAR RATIN AND RATOUT ACCUMULATORS, AND SET CELL-BY-CELL
@@ -1678,7 +1745,7 @@ C-------STORAGE TERM ON SOIL
           CWO = 0.0
           IF(CONCIM(N,ICOMP).GT.0.0) CW = CONCIM(N,ICOMP)
           IF(CONCOIM(N,ICOMP).GT.0.0) CWO = CONCOIM(N,ICOMP)
-          QQ = ADSTERM * (CW/(1.0+FL*CW) - CWO/(1.0+FL*CWO))          
+          QQ = ADSTERM * (CW/(1.0+FL*CW) - CWO/(1.0+FL*CWO))
         ENDIF
       ELSE
         QQ = QQ + VODT * CONCIM(N,ICOMP)
@@ -1808,7 +1875,7 @@ C-------DECAY TERM ON SOIL (NO ADSORPTION ON CLN)
 C
 C---------ZERO ORDER DECAY ON SOIL
             IF(IZODIM.GE.2.AND.IADSORBIM.GT.0)THEN
-            CT = -(1.0-PRSITYIM(N)) * VOLU * ZODRSIM(N,ICOMP)
+            CT = - VOLU * ZODRSIM(N,ICOMP) ! * (1.0-PRSITYIM(N)) ZODRSIM already has this
             EPS = 0.01
             CEPS = MAX(0.0,CONCIM(N,ICOMP))
             X = CEPS /EPS
@@ -1818,28 +1885,28 @@ C---------ZERO ORDER DECAY ON SOIL
 C
 C---------FIRST ORDER DECAY ON SOIL
           IF(IFODIM.GE.2.AND.IADSORBIM.GT.0)THEN
-            CT = -ADSORBIM(N,ICOMP) * VOLU * FODRSIM(N,ICOMP) ! * (1.0-PRSITYIM(N)) ???
+            CT = -ADSORBIM(N,ICOMP) * VOLU * FODRSIM(N,ICOMP) ! * (1.0-PRSITYIM(N)) FODRSIM already has this
             IF(IADSORBIM.EQ.1)THEN
 C--------------FOR LINEAR ADSORPTION
               QQ = QQ + CT * CONCIM(N,ICOMP)
             ELSEIF(IADSORBIM.EQ.2)THEN
-C--------------FOR NON-LINEAR FREUNDLICH ADSORPTION 
+C--------------FOR NON-LINEAR FREUNDLICH ADSORPTION
               ETA = FLICHIM(N,ICOMP)
               QQ =  CT * CONCIM(N,ICOMP) ** ETA
             ELSEIF(IADSORBIM.EQ.3)THEN
-C--------------FOR NON-LINEAR LANGMUIR ADSORPTION 
+C--------------FOR NON-LINEAR LANGMUIR ADSORPTION
               ETA = FLICHIM(N,ICOMP)
-              QQ =  CT * CONCIM(N,ICOMP) / (1.0 + ETA*CONCIM(N,ICOMP)) 
+              QQ =  CT * CONCIM(N,ICOMP) / (1.0 + ETA*CONCIM(N,ICOMP))
             ENDIF
           ENDIF
-C --------DECAY ON AIR-WATER INTERFACE ADSORBED SOLUTES              
+C --------DECAY ON AIR-WATER INTERFACE ADSORBED SOLUTES
           IF(IAW_ADSORBIM.NE.0)
      *     CALL GWT2DPT1DCYAWIM1BD(N,ICOMP,QQ,VOLU)
         ENDIF
-C-----------------------------------------------------------------------------          
+C-----------------------------------------------------------------------------
 C-------DECAY TERM IN WATER
 C-----------------------------------------------------------------------------
-C-------ZERO ORDER DECAY IN WATER 
+C-------ZERO ORDER DECAY IN WATER
         IF(IZODIM.EQ.1.OR.IZODIM.EQ.3)THEN
           CT = -SnIM(N)* VOLU * ZODRWIM(N,ICOMP)
           EPS = 0.01
@@ -1942,7 +2009,7 @@ C     ------------------------------------------------------------------
       USE GWTDPTMODULE, ONLY: ICBUNDIM,CONCIM,IDPTCB,
      1 IADSORBIM,ADSORBIM,FLICHIM,PRSITYIM,CONCOIM,IZODIM,IFODIM,
      1 ZODRWIM,FODRWIM,ZODRSIM,FODRSIM,SPTLRCTIM, IAW_ADSORBIM
-      USE GWFDPFMODULE, ONLY: PHIF,SnIM      
+      USE GWFDPFMODULE, ONLY: PHIF,SnIM
 C
       CHARACTER*16 TEXT(2)
       DOUBLE PRECISION RATIN,RATOUT,QQ,VOLU,ADSTERM,FL,CW,CWO,ALENG,X,Y,
@@ -1987,7 +2054,7 @@ C ------ DO FOR ALL PARENTS OF COMPONENT ICOMP
         DTERMD = 0.0
         RTERMD = 0.0
         IPAREN = JPARENT(ICOMP,NPAREN)
-        IF(ISPRCT.EQ.0)THEN 
+        IF(ISPRCT.EQ.0)THEN
           STOIT  = STOTIO(ICOMP,NPAREN)
         ELSE
           STOIT = SPTLRCTIM(N,ICOMP,NPAREN)
@@ -2014,19 +2081,19 @@ C8---------FIRST ORDER GENERATION ON SOIL
             IF(IADSORBIM.EQ.1)THEN
 C9--------------FOR LINEAR ADSORPTION
               QQ = QQ + CT * CONCIM(N,IPAREN)
-            ELSEIF(IADSORBIM.EQ.2) THEN 
-C10--------------FOR NON-LINEAR FREUNDLICH ADSORPTION 
+            ELSEIF(IADSORBIM.EQ.2) THEN
+C10--------------FOR NON-LINEAR FREUNDLICH ADSORPTION
               ETA = FLICHIM(N,IPAREN)
               QQ =  QQ + CT * CONCIM(N,IPAREN) ** ETA
-C10--------------FOR NON-LINEAR LANGMUIR ADSORPTION 
+C10--------------FOR NON-LINEAR LANGMUIR ADSORPTION
               ETA = FLICHIM(N,IPAREN)
               QQ =  QQ + CT*CONCIM(N,IPAREN)/ (1.0+ETA*CONCIM(N,IPAREN))
             ENDIF
           ENDIF
-C --------GENERATION ON AIR-WATER INTERFACE ADSORBED SOLUTES              
+C --------GENERATION ON AIR-WATER INTERFACE ADSORBED SOLUTES
           IF(IAW_ADSORBIM.NE.0)
-     *     CALL GWT2DPT1GENAWIM1BD(N,ICOMP,QQ,VOLU,NPAREN)             
-               
+     *     CALL GWT2DPT1GENAWIM1BD(N,ICOMP,QQ,VOLU,NPAREN)
+
         ENDIF
 C-----------------------------------------------------------------------------
 C11-------GENERATION TERM IN WATER
@@ -2183,11 +2250,11 @@ C        SPECIFICATIONS:
 C     ------------------------------------------------------------------
       USE GLOBAL,       ONLY:NODES
       USE GWTDPTMODULE, ONLY:CONCOIM,CONCIM
-      USE GWTBCTMODULE, ONLY: MCOMP
+      USE GWTBCTMODULE, ONLY: MCOMP,NTCOMP
 C     ------------------------------------------------------------------
 C
-C1----COPY NEW TO OLD VARIABLES
-      DO ICOMP=1,MCOMP
+C1----COPY NEW TO OLD VARIABLES (ALL COMPONENTS INCLUDING IMMOBILE)
+      DO ICOMP=1,NTCOMP
       DO N=1,NODES
         CONCOIM(N,ICOMP) = CONCIM(N,ICOMP)
       ENDDO
@@ -2206,13 +2273,13 @@ C        SPECIFICATIONS:
 C     ------------------------------------------------------------------
       USE GLOBAL,      ONLY:ITMUNI,IOUT,IUNSTR
       USE GWFBASMODULE,ONLY:DELT,PERTIM,TOTIM,ISPCFL,IBUDFL
-      USE GWTBCTMODULE, ONLY: MCOMP,VBVLT,VBNMT,MSUMT
+      USE GWTBCTMODULE, ONLY: MCOMP,VBVLT,VBNMT,MSUMT,NTCOMP
 C     ------------------------------------------------------------------
 C
 C
 C1------CLEAR PRINTOUT FLAG (IPFLG)
       IPFLG=0
-      DO ICOMP = 1,MCOMP
+      DO ICOMP = 1,NTCOMP
         WRITE(IOUT,1)ICOMP
 1       FORMAT(5X,'TRANSPORT SOLUTION COMPLETE FOR COMPONENT SPECIES',
      *    1X,'NUMBER',I5,' IN IMMOBILE DOMAIN'/5X,80('-'))
@@ -2263,12 +2330,12 @@ C     ------------------------------------------------------------------
       USE GWFBASMODULE,ONLY:PERTIM,TOTIM,IOFLG,ISPCFM,LBHDSV,
      2                      CSPCFM,IOFLG,ISPCUN
       USE GWTDPTMODULE, ONLY: CONCIM,IDPTCON,ICBUNDIM
-      USE GWTBCTMODULE,ONLY:IMULTI,CROOTNAME      
+      USE GWTBCTMODULE,ONLY:IMULTI,CROOTNAME
 C
       REAL,          SAVE,    DIMENSION(:,:,:),    ALLOCATABLE ::BUFF
-      REAL*8,        SAVE,    DIMENSION(:,:,:),    ALLOCATABLE ::BUFF8  
+      REAL*8,        SAVE,    DIMENSION(:,:,:),    ALLOCATABLE ::BUFF8
       CHARACTER*400 CFILENAME
-      CHARACTER*16 TEXT, ISTATUS, FORMC
+      CHARACTER*16 TEXT, ISTATUS, FORMC, ACCESC
 C      DATA TEXT /'   IMMOBILE CONC'/
       INCLUDE 'openspec.inc'
 C     ------------------------------------------------------------------
@@ -2327,22 +2394,24 @@ C5------IF SO THEN CALL ULASAV OR ULASV2 TO SAVE CONC.
 C--------------------------------------------------------------------------------------------------------------------
 C5A ----FOR MULTIFILE OUTPUT OPTION, ADD COMPONENT SPECIES TO ROOT NAME AND OPEN FILE ON ISPCFM AND GO TO END OF FILE
       IF(IMULTI.NE.0)THEN
-        CALL GET_TEXTC(ICOMP,TEXT)  
+        CALL GET_TEXTC(ICOMP,TEXT)
         CFILENAME = trim(CROOTNAME) // TRIM(TEXT) //'_DPT.CON'
         ISTATUS = 'OLD'
         FORMC = 'FORMATTED'
-        IF(CSPCFM.EQ.' ') FORMC = FORM      ! - use FORM from openspec.inc rather than hardwiring BINARY or UNFORMATTED  
+        ACCESC = 'SEQUENTIAL'
+        IF(CSPCFM.EQ.' ') FORMC = FORM      ! - use FORM from openspec.inc rather than hardwiring BINARY or UNFORMATTED
+        IF(CSPCFM.EQ.' ') ACCESC = ACCESS
 CC        IF(KSTP.EQ.1.AND.KPER.EQ.1) THEN
 C---------MAKE STATUS OF FILE AS NEW WHEN FIRST ENTERING FILE
 CC          ISTATUS = 'REPLACE'
 CC        ENDIF
 C
-!        OPEN(IDPTCON, FILE = CFILENAME, FORM = 'BINARY',   
-        OPEN(ISPCUN, FILE = CFILENAME, FORM = FORMC,
+!        OPEN(IDPTCON, FILE = CFILENAME, FORM = 'BINARY',
+        OPEN(ISPCUN, FILE = CFILENAME, FORM = FORMC, ACCESS = ACCESC,
      1  STATUS = ISTATUS, POSITION = 'APPEND')
-        IBUN = ISPCUN 
+        IBUN = ISPCUN
       ENDIF
-C-------------------------------------------------------------------------------------------------------------            
+C-------------------------------------------------------------------------------------------------------------
       IF(IXSEC.EQ.0) THEN
         DO 79 K=1,NLAY
         NSTRT = NODLAY(K-1)+1
@@ -2353,9 +2422,9 @@ C-------------------------------------------------------------------------------
      1      ' AT END OF TIME STEP ',I3,', STRESS PERIOD ',I4)
         IFIRST=0
         IF(IDPOUT.EQ.1) THEN
-           WRITE(IOUT,*)'  CONC AND TIME VARIABLES ARE SAVED AS REAL*8' 
+           WRITE(IOUT,*)'  CONC AND TIME VARIABLES ARE SAVED AS REAL*8'
            CALL ULASAV8(BUFF8(1,1,K),TEXT,KSTP,KPER,PERTIM,TOTIM,NCOL,
-     1                NROW,KK,IBUN)        
+     1                NROW,KK,IBUN)
         ELSEIF(CSPCFM.EQ.' ') THEN
            CALL ULASAV(BUFF(1,1,K),TEXT,KSTP,KPER,PERTIM,TOTIM,NCOL,
      1                NROW,KK,IBUN)
@@ -2370,9 +2439,9 @@ C5A-----SAVE CONC FOR CROSS SECTION.
         IF(IOFLG(1,6).NE.0) THEN
           WRITE(IOUT,74) IBUN,KSTP,KPER
           IF(IDPOUT.EQ.1)THEN
-           WRITE(IOUT,*)'  CONC AND TIME VARIABLES ARE SAVED AS REAL*8' 
+           WRITE(IOUT,*)'  CONC AND TIME VARIABLES ARE SAVED AS REAL*8'
              CALL ULASAV8(BUFF8,TEXT,KSTP,KPER,PERTIM,TOTIM,NCOL,
-     1                NLAY,-1,IBUN)          
+     1                NLAY,-1,IBUN)
           ELSEIF(CSPCFM.EQ.' ') THEN
              CALL ULASAV(BUFF,TEXT,KSTP,KPER,PERTIM,TOTIM,NCOL,
      1                NLAY,-1,IBUN)
@@ -2397,56 +2466,56 @@ C     ******************************************************************
 C
 C        SPECIFICATIONS:
 C     ------------------------------------------------------------------
-      
-      USE GWTBCTMODULE, ONLY: MCOMP
+
+      USE GWTBCTMODULE, ONLY: MCOMP,NTCOMP
       CHARACTER*16 TEXT
 C     ------------------------------------------------------------------
 C
-      IF(MCOMP.EQ.1) THEN
-        TEXT = '   IMMOBILE CONC'  
+      IF(NTCOMP.EQ.1) THEN
+        TEXT = '   IMMOBILE CONC'
       ELSE
-        IF(ICOMP.EQ.1) THEN  
+        IF(ICOMP.EQ.1) THEN
           TEXT = ' IMMOBILE CONC01'
-        ELSEIF(ICOMP.EQ.2) THEN 
+        ELSEIF(ICOMP.EQ.2) THEN
           TEXT = ' IMMOBILE CONC02'
-        ELSEIF(ICOMP.EQ.3) THEN             
+        ELSEIF(ICOMP.EQ.3) THEN
           TEXT = ' IMMOBILE CONC03'
-        ELSEIF(ICOMP.EQ.4) THEN             
+        ELSEIF(ICOMP.EQ.4) THEN
           TEXT = ' IMMOBILE CONC04'
-        ELSEIF(ICOMP.EQ.5) THEN             
+        ELSEIF(ICOMP.EQ.5) THEN
           TEXT = ' IMMOBILE CONC05'
-        ELSEIF(ICOMP.EQ.6) THEN             
+        ELSEIF(ICOMP.EQ.6) THEN
           TEXT = ' IMMOBILE CONC06'
-        ELSEIF(ICOMP.EQ.7) THEN             
+        ELSEIF(ICOMP.EQ.7) THEN
           TEXT = ' IMMOBILE CONC07'
-        ELSEIF(ICOMP.EQ.8) THEN             
+        ELSEIF(ICOMP.EQ.8) THEN
           TEXT = ' IMMOBILE CONC08'
-        ELSEIF(ICOMP.EQ.9) THEN             
+        ELSEIF(ICOMP.EQ.9) THEN
           TEXT = ' IMMOBILE CONC09'
-        ELSEIF(ICOMP.EQ.10) THEN             
+        ELSEIF(ICOMP.EQ.10) THEN
           TEXT = ' IMMOBILE CONC10'
-        ELSEIF(ICOMP.EQ.11) THEN             
+        ELSEIF(ICOMP.EQ.11) THEN
           TEXT = ' IMMOBILE CONC11'
-        ELSEIF(ICOMP.EQ.12) THEN               
+        ELSEIF(ICOMP.EQ.12) THEN
           TEXT = ' IMMOBILE CONC12'
-        ELSEIF(ICOMP.EQ.13) THEN   
+        ELSEIF(ICOMP.EQ.13) THEN
           TEXT = ' IMMOBILE CONC13'
-        ELSEIF(ICOMP.EQ.14) THEN             
+        ELSEIF(ICOMP.EQ.14) THEN
           TEXT = ' IMMOBILE CONC14'
-        ELSEIF(ICOMP.EQ.15) THEN               
+        ELSEIF(ICOMP.EQ.15) THEN
           TEXT = ' IMMOBILE CONC15'
-        ELSEIF(ICOMP.EQ.16) THEN             
+        ELSEIF(ICOMP.EQ.16) THEN
           TEXT = ' IMMOBILE CONC16'
-        ELSEIF(ICOMP.EQ.17) THEN             
+        ELSEIF(ICOMP.EQ.17) THEN
           TEXT = ' IMMOBILE CONC17'
-        ELSEIF(ICOMP.EQ.18) THEN               
+        ELSEIF(ICOMP.EQ.18) THEN
           TEXT = ' IMMOBILE CONC18'
-        ELSEIF(ICOMP.EQ.19) THEN             
+        ELSEIF(ICOMP.EQ.19) THEN
           TEXT = ' IMMOBILE CONC19'
-        ELSEIF(ICOMP.EQ.20) THEN             
+        ELSEIF(ICOMP.EQ.20) THEN
           TEXT = ' IMMOBILE CONC20'
-        ENDIF             
-      ENDIF            
+        ENDIF
+      ENDIF
 C
 C6------RETURN.
       RETURN
@@ -2468,8 +2537,8 @@ C     ------------------------------------------------------------------
 C
       REAL*8,        SAVE,    DIMENSION(:),    ALLOCATABLE ::BUFF8
       CHARACTER*400 CFILENAME
-      CHARACTER*16 TEXT, ISTATUS, FORMC
-      DATA TEXT /'  IMMOBILE CONCU'/ 
+      CHARACTER*16 TEXT, ISTATUS, FORMC, ACCESC
+      DATA TEXT /'  IMMOBILE CONCU'/
       INCLUDE 'openspec.inc'
 C     ------------------------------------------------------------------
 C
@@ -2520,27 +2589,29 @@ C
 C5------FOR EACH LAYER: DETERMINE IF CONC SHOULD BE SAVED ON DISK.
 C5------IF SO THEN CALL ULASAV OR ULASV2 TO SAVE HEAD.
       IFIRST=1
-      IBUN = IDPTCON ! UNIT NUMBER FOR OUTPUT IS IDPTCON IF NOT MULTISPECIES      
+      IBUN = IDPTCON ! UNIT NUMBER FOR OUTPUT IS IDPTCON IF NOT MULTISPECIES
       IF(IDPTCON.LE.0) GO TO 80
 C--------------------------------------------------------------------------------------------------------------------
 C5A ----FOR MULTIFILE OUTPUT OPTION, ADD COMPONENT SPECIES TO ROOT NAME AND OPEN FILE ON ISPCFM AND GO TO END OF FILE
       IF(IMULTI.NE.0)THEN
-        CALL GET_TEXTC(ICOMP,TEXT)  
+        CALL GET_TEXTC(ICOMP,TEXT)
         CFILENAME = trim(CROOTNAME) // TRIM(TEXT) //'_DPT.CON'
         ISTATUS = 'OLD'
         FORMC = 'FORMATTED'
+        ACCESC = 'SEQUENTIAL'
         IF(CSPCFM.EQ.' ') FORMC = FORM        ! - use FORM from openspec.inc rather than hardwiring BINARY or UNFORMATTED
+        IF(CSPCFM.EQ.' ') ACCESC = ACCESS
 CC        IF(KSTP.EQ.1.AND.KPER.EQ.1) THEN
 C---------MAKE STATUS OF FILE AS NEW WHEN FIRST ENTERING FILE
 CC          ISTATUS = 'REPLACE'
 CC        ENDIF
 C
-!        OPEN(IDPTCON, FILE = CFILENAME, FORM = 'BINARY',   
-        OPEN(ISPCUN, FILE = CFILENAME, FORM = FORMC,
+!        OPEN(IDPTCON, FILE = CFILENAME, FORM = 'BINARY',
+        OPEN(ISPCUN, FILE = CFILENAME, FORM = FORMC, ACCESS = ACCESC,
      1  STATUS = ISTATUS, POSITION = 'APPEND')
         IBUN = ISPCUN
       ENDIF
-C-------------------------------------------------------------------------------------------------------------      
+C-------------------------------------------------------------------------------------------------------------
       IF(IXSEC.EQ.0) THEN
         DO 79 K=1,NLAY
         KK=K
@@ -2551,7 +2622,7 @@ C-------------------------------------------------------------------------------
    74   FORMAT(1X,/1X,'IMMOBILE CONC WILL BE SAVED ON UNIT ',I8,
      1      ' AT END OF TIME STEP ',I8,', STRESS PERIOD ',I8)
         IFIRST=0
-        IF(IDPOUT.EQ.1)THEN 
+        IF(IDPOUT.EQ.1)THEN
           WRITE(IOUT,*)'  CONC AND TIME VARIABLES ARE SAVED AS REAL*8'
           CALL ULASAVU8(BUFF8,TEXT,KSTP,KPER,PERTIM,TOTIM,NSTRT,
      1                NNDLAY,KK,IBUN,NODES)
@@ -2569,7 +2640,7 @@ C5A-----SAVE CONC FOR CROSS SECTION.
       ELSE
         IF(IOFLG(1,6).NE.0) THEN
           WRITE(IOUT,74) IBUN,KSTP,KPER
-          IF(IDPOUT.EQ.1) THEN 
+          IF(IDPOUT.EQ.1) THEN
             WRITE(IOUT,*)'  CONC AND TIME VARIABLES ARE SAVED AS REAL*8'
             CALL ULASAVU8(BUFF8,TEXT,KSTP,KPER,PERTIM,TOTIM,NSTRT,
      1                NNDLAY,-1,IBUN,NODES)
@@ -2606,7 +2677,7 @@ C     ------------------------------------------------------------------
       USE GWTDPTMODULE, ONLY: CONCIM, CONCOIM
       USE GWTBCTMODULE, ONLY: MCOMP,CONC,CONCO,ICT,IADSORB,PRSITY,
      *  ADSORB,IZOD,IFOD,ZODRW,FODRW,ZODRS,FODRS,MCOMPT,IHEAT,
-     *  ISOLUBILITY,SOLLIM,SOLSLOPE 
+     *  ISOLUBILITY,SOLLIM,SOLSLOPE
       DOUBLE PRECISION VODT,CW,CWO,DT,RT,ALENG,VOLU,SLIM,SSLOPE,FN,DF,
      1  X,Y,EPSS,EPS,CT,CEPS,QA,QEPS,DQ,OMP,DTERMS,RTERMS,EMOLD,EMNEW
 C     ------------------------------------------------------------------
@@ -2627,24 +2698,24 @@ C          SSLOPE = SOLSLOPE(ICOMP) * VODT
 C          SLIM = SOLLIM(ICOMP)
 C          CW = CONC(N,ICOMP)
 C          CWO = CONCO(N,ICOMP)
-CC         
+CC
 C          DT = 0.0
 C          RT = 0.0
 C          IF(CWO.GT.SLIM)THEN
 C            RT = -CWO
 C          ENDIF
 C          IF(CW.GT.SLIM)THEN
-C            DT = SSLOPE 
+C            DT = SSLOPE
 C            RT = RT + CW
 C          ENDIF
 C          RT = RT * SSLOPE
 C          DTERMS = DTERMS - DT
-C          RTERMS = RTERMS - DT * CW + RT          
-C ----------------------------------------------------------------          
-          SSLOPE = SOLSLOPE(ICOMP) 
+C          RTERMS = RTERMS - DT * CW + RT
+C ----------------------------------------------------------------
+          SSLOPE = SOLSLOPE(ICOMP)
           SLIM = SOLLIM(ICOMP)
           CW = CONCIM(N,ICOMP)
-          CWO = CONCOIM(N,ICOMP)          
+          CWO = CONCOIM(N,ICOMP)
           EMOLD = 0.0
           IF(CWO.GT.SLIM) EMOLD = (CWO-SLIM) * SSLOPE
           EMNEW = 0.0
@@ -2654,10 +2725,10 @@ C ----------------------------------------------------------------
           CW = CW + 1.0E-4
           EMNEW = 0.0
           IF(CW.GT.SLIM) EMNEW = (CW-SLIM) * SSLOPE
-          DF = (EMNEW - DF) / 1.0E-4 
+          DF = (EMNEW - DF) / 1.0E-4
           DF = DF * VODT
           RTERMS = FN - DF * CW
-          DTERMS = - DF 
+          DTERMS = - DF
 C-----------------------------------------------------------------------
       ELSE       !-----------------------TOTAL CONCENTRATION FORMULATION
 C5-------NET STORAGE TERM FOR TOTAL CONCENTRATION FORMULATION
@@ -2683,7 +2754,7 @@ C     ------------------------------------------------------------------
       USE GWTDPTMODULE, ONLY: CONCIM, CONCOIM
       USE GWTBCTMODULE, ONLY: ICBUND,CONC,MSUMT,VBVLT,VBNMT,IBCTCB,
      1 IADSORB,ADSORB,PRSITY,CONCO,ICT,MCOMPT,
-     *  ISOLUBILITY,SOLLIM,SOLSLOPE  
+     *  ISOLUBILITY,SOLLIM,SOLSLOPE
 C
       CHARACTER*16 TEXT(1)
       DOUBLE PRECISION RATIN,RATOUT,QQ,VODT,ADSTERM,FL,CW,CWO,ALENG,
@@ -2725,12 +2796,12 @@ C
         QQ = 0.0
         IF(ICT.EQ.0)THEN
 C5-------PRECIPITATED MASS - SKIP IF IMMOBILE COMPONENTS
-          IF(ICOMP.GT.MCOMPT) GO TO 252  
-CC        
-          SSLOPE = SOLSLOPE(ICOMP) 
+          IF(ICOMP.GT.MCOMPT) GO TO 252
+CC
+          SSLOPE = SOLSLOPE(ICOMP)
           SLIM = SOLLIM(ICOMP)
           CW = CONCIM(N,ICOMP)
-          CWO = CONCOIM(N,ICOMP)          
+          CWO = CONCOIM(N,ICOMP)
           EMOLD = 0.0
           IF(CWO.GT.SLIM) EMOLD = (CWO-SLIM) * SSLOPE
           EMNEW = 0.0
@@ -2740,12 +2811,12 @@ CC
           CW = CW + 1.0E-4
           EMNEW = 0.0
           IF(CW.GT.SLIM) EMNEW = (CW-SLIM) * SSLOPE
-          DF = (EMNEW - DF) / 1.0E-4 
+          DF = (EMNEW - DF) / 1.0E-4
           DF = DF * VODT
           RTERMS = FN - DF * CW
-          DTERMS = - DF 
-          qq = rterms - dterms * concIM(n,icomp) 
-252       CONTINUE        
+          DTERMS = - DF
+          qq = rterms - dterms * concIM(n,icomp)
+252       CONTINUE
 C-----------------------------------------------------
         ELSE   !-----------------------TOTAL CONCENTRATION FORMULATION
 C7-------NET STORAGE TERM FOR TOTAL CONCENTRATION FORMULATION
@@ -2801,7 +2872,7 @@ C13------CALL UBUDSV TO SAVE THEM.
           CALL UBUDSVU(KSTP,KPER,TEXT(1),IBCTCB,BUFF,NODES,
      1                          IOUT,PERTIM,TOTIM)
         ENDIF
-      ENDIF  
+      ENDIF
 C
 C14------MOVE RATES, VOLUMES & LABELS INTO ARRAYS FOR PRINTING.
   200 RIN=RATIN
@@ -2826,6 +2897,11 @@ C ------------------------------------------------------------
       INTEGER ALLOC_ERR
 C
       DEALLOCATE(ICBUNDIM, STAT = ALLOC_ERR)
+      IF(ISD_MASS_TR.EQ.0) THEN
+        DEALLOCATE(DDTTR, STAT = ALLOC_ERR)
+      ELSE
+        DEALLOCATE(DDTTRSD, STAT = ALLOC_ERR)
+      ENDIF
       DEALLOCATE(PRSITYIM, STAT = ALLOC_ERR)
       DEALLOCATE(CONCIM, STAT = ALLOC_ERR)
       DEALLOCATE(CONCOIM, STAT = ALLOC_ERR)
@@ -2842,7 +2918,7 @@ C
       DEALLOCATE(IDISPIM, STAT = ALLOC_ERR)
       DEALLOCATE(IFODIM, IZODIM, STAT = ALLOC_ERR)
 
-      IF(IAW_ADSORBIM.EQ.1) THEN 
+      IF(IAW_ADSORBIM.EQ.1) THEN
          DEALLOCATE (IAREA_FNIM, STAT = ALLOC_ERR)
          DEALLOCATE (IKAWI_FNIM, STAT = ALLOC_ERR)
          DEALLOCATE (ITAB_AWIIM, STAT = ALLOC_ERR)
