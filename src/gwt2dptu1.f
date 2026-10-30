@@ -2335,7 +2335,7 @@ C
       REAL,          SAVE,    DIMENSION(:,:,:),    ALLOCATABLE ::BUFF
       REAL*8,        SAVE,    DIMENSION(:,:,:),    ALLOCATABLE ::BUFF8
       CHARACTER*400 CFILENAME
-      CHARACTER*16 TEXT, ISTATUS, FORMC
+      CHARACTER*16 TEXT, ISTATUS, FORMC, ACCESC
 C      DATA TEXT /'   IMMOBILE CONC'/
       INCLUDE 'openspec.inc'
 C     ------------------------------------------------------------------
@@ -2398,14 +2398,16 @@ C5A ----FOR MULTIFILE OUTPUT OPTION, ADD COMPONENT SPECIES TO ROOT NAME AND OPEN
         CFILENAME = trim(CROOTNAME) // TRIM(TEXT) //'_DPT.CON'
         ISTATUS = 'OLD'
         FORMC = 'FORMATTED'
+        ACCESC = 'SEQUENTIAL'
         IF(CSPCFM.EQ.' ') FORMC = FORM      ! - use FORM from openspec.inc rather than hardwiring BINARY or UNFORMATTED
+        IF(CSPCFM.EQ.' ') ACCESC = ACCESS
 CC        IF(KSTP.EQ.1.AND.KPER.EQ.1) THEN
 C---------MAKE STATUS OF FILE AS NEW WHEN FIRST ENTERING FILE
 CC          ISTATUS = 'REPLACE'
 CC        ENDIF
 C
 !        OPEN(IDPTCON, FILE = CFILENAME, FORM = 'BINARY',
-        OPEN(ISPCUN, FILE = CFILENAME, FORM = FORMC,
+        OPEN(ISPCUN, FILE = CFILENAME, FORM = FORMC, ACCESS = ACCESC,
      1  STATUS = ISTATUS, POSITION = 'APPEND')
         IBUN = ISPCUN
       ENDIF
@@ -2535,7 +2537,7 @@ C     ------------------------------------------------------------------
 C
       REAL*8,        SAVE,    DIMENSION(:),    ALLOCATABLE ::BUFF8
       CHARACTER*400 CFILENAME
-      CHARACTER*16 TEXT, ISTATUS, FORMC
+      CHARACTER*16 TEXT, ISTATUS, FORMC, ACCESC
       DATA TEXT /'  IMMOBILE CONCU'/
       INCLUDE 'openspec.inc'
 C     ------------------------------------------------------------------
@@ -2596,14 +2598,16 @@ C5A ----FOR MULTIFILE OUTPUT OPTION, ADD COMPONENT SPECIES TO ROOT NAME AND OPEN
         CFILENAME = trim(CROOTNAME) // TRIM(TEXT) //'_DPT.CON'
         ISTATUS = 'OLD'
         FORMC = 'FORMATTED'
+        ACCESC = 'SEQUENTIAL'
         IF(CSPCFM.EQ.' ') FORMC = FORM        ! - use FORM from openspec.inc rather than hardwiring BINARY or UNFORMATTED
+        IF(CSPCFM.EQ.' ') ACCESC = ACCESS
 CC        IF(KSTP.EQ.1.AND.KPER.EQ.1) THEN
 C---------MAKE STATUS OF FILE AS NEW WHEN FIRST ENTERING FILE
 CC          ISTATUS = 'REPLACE'
 CC        ENDIF
 C
 !        OPEN(IDPTCON, FILE = CFILENAME, FORM = 'BINARY',
-        OPEN(ISPCUN, FILE = CFILENAME, FORM = FORMC,
+        OPEN(ISPCUN, FILE = CFILENAME, FORM = FORMC, ACCESS = ACCESC,
      1  STATUS = ISTATUS, POSITION = 'APPEND')
         IBUN = ISPCUN
       ENDIF

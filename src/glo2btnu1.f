@@ -549,7 +549,7 @@ C     ------------------------------------------------------------------
       DOUBLE PRECISION,  SAVE,    DIMENSION(:),    ALLOCATABLE ::BUFF8  
       DOUBLE PRECISION MASLOCW,MASLOCS,MASLOCC,REFHD,MASLOPR,MASLOAWI,
      1  ETA,VOLU,ALENG,CW,SLIM,SSLOPE 
-      CHARACTER*16 TEXT,ISTATUS,FORMM  
+      CHARACTER*16 TEXT,ISTATUS,FORMM, ACCESM
       CHARACTER*400 CFILENAME          
       INCLUDE 'openspec.inc'  
 C      DATA TEXT /'    SOLUTE MASS'/
@@ -664,14 +664,16 @@ C5A ----FOR MULTIFILE OUTPUT OPTION, ADD COMPONENT SPECIES TO ROOT NAME AND OPEN
         CFILENAME = trim(CROOTNAME) // TRIM(TEXT) //'.MAS'
         ISTATUS = 'OLD'
         FORMM = 'FORMATTED'
+        ACCESM = 'SEQUENTIAL'
         IF(CSPCFM.EQ.' ') FORMM = FORM            ! - use FORM from openspec.inc rather than hardwiring BINARY or UNFORMATTED
+        IF(CSPCFM.EQ.' ') ACCESM = ACCESS
 CC        IF(KSTP.EQ.1.AND.KPER.EQ.1) THEN
 C---------MAKE STATUS OF FILE AS NEW WHEN FIRST ENTERING FILE
 CC          ISTATUS = 'REPLACE'
 CC        ENDIF
 
 !        OPEN(ISPCUN, FILE = CFILENAME, FORM = 'BINARY',   
-        OPEN(IMASSWR, FILE = CFILENAME, FORM = FORMM,
+        OPEN(IMASSWR, FILE = CFILENAME, FORM = FORMM, ACCESS = ACCESM,
      1  STATUS = ISTATUS, POSITION = 'APPEND')
       ENDIF
 C--------------------------------------------------------------------------------------------------------------------              
@@ -4466,7 +4468,7 @@ C
       REAL,          SAVE,    DIMENSION(:,:,:),    ALLOCATABLE ::BUFF
       REAL*8,        SAVE,    DIMENSION(:,:,:),    ALLOCATABLE ::BUFF8
       CHARACTER*400 CFILENAME      
-      CHARACTER*16 TEXT,ISTATUS,FORMC 
+      CHARACTER*16 TEXT,ISTATUS,FORMC, ACCESC
       INCLUDE 'openspec.inc'      
 CSP      DATA TEXT /'            CONC'/
 C     ------------------------------------------------------------------
@@ -4527,14 +4529,16 @@ C5A ----FOR MULTIFILE OUTPUT OPTION, ADD COMPONENT SPECIES TO ROOT NAME AND OPEN
         CFILENAME = trim(CROOTNAME) // TRIM(TEXT) //'.CON'
         ISTATUS = 'OLD'
         FORMC = 'FORMATTED'
+        ACCESC = 'SEQUENTIAL'
         IF(CSPCFM.EQ.' ') FORMC = FORM            ! - use FORM from openspec.inc rather than hardwiring BINARY or UNFORMATTED
+        IF(CSPCFM.EQ.' ') ACCESC = ACCESS
 CC        IF(KSTP.EQ.1.AND.KPER.EQ.1) THEN
 C---------MAKE STATUS OF FILE AS NEW WHEN FIRST ENTERING FILE
 CC          ISTATUS = 'REPLACE'
 CC        ENDIF
 
 !        OPEN(ISPCUN, FILE = CFILENAME, FORM = 'BINARY',   
-        OPEN(ISPCUN, FILE = CFILENAME, FORM = FORMC,
+        OPEN(ISPCUN, FILE = CFILENAME, FORM = FORMC, ACCESS = ACCESC,
      1  STATUS = ISTATUS, POSITION = 'APPEND')
       ENDIF
 C--------------------------------------------------------------------------------------------------------------------      
@@ -5104,7 +5108,7 @@ C     ------------------------------------------------------------------
       DOUBLE PRECISION,  SAVE,    DIMENSION(:),    ALLOCATABLE ::BUFF8
 C
       CHARACTER*400 CFILENAME
-      CHARACTER*16 TEXT, ISTATUS, FORMC
+      CHARACTER*16 TEXT, ISTATUS, FORMC, ACCESC
 C     kkz - include openspec.inc
       INCLUDE 'openspec.inc'
 csp      DATA TEXT /'            CONC'/
@@ -5164,14 +5168,16 @@ C5A ----FOR MULTIFILE OUTPUT OPTION, ADD COMPONENT SPECIES TO ROOT NAME AND OPEN
         CFILENAME = trim(CROOTNAME) // TRIM(TEXT) //'.CON'
         ISTATUS = 'OLD'
         FORMC = 'FORMATTED'
+        ACCESC = 'SEQUENTIAL'
         IF(CSPCFM.EQ.' ') FORMC = FORM     ! - use FORM from openspec.inc rather than hardwiring BINARY or UNFORMATTED    
+        IF(CSPCFM.EQ.' ') ACCESC = ACCESS
 CC        IF(KSTP.EQ.1.AND.KPER.EQ.1) THEN
 C---------MAKE STATUS OF FILE AS NEW WHEN FIRST ENTERING FILE
 CC          ISTATUS = 'REPLACE'
 CC        ENDIF
 
 csp        OPEN(ISPCUN, FILE = CFILENAME, FORM = 'BINARY',   
-        OPEN(ISPCUN, FILE = CFILENAME, FORM = FORMC,
+        OPEN(ISPCUN, FILE = CFILENAME, FORM = FORMC, ACCESS = ACCESC,
      1  STATUS = ISTATUS, POSITION = 'APPEND')
       ENDIF
 C--------------------------------------------------------------------------------------------------------------------
@@ -5282,7 +5288,7 @@ C     ------------------------------------------------------------------
       USE GWTBCTMODULE, ONLY: ICBUND,CONC,IMULTI,CROOTNAME
 C
       CHARACTER*400 CFILENAME
-      CHARACTER*16 TEXT,ISTATUS, FORMC
+      CHARACTER*16 TEXT,ISTATUS, FORMC, ACCESC
       DOUBLE PRECISION SSTRT
       REAL,          SAVE,    DIMENSION(:),    ALLOCATABLE ::BUFF
       REAL*8,        SAVE,    DIMENSION(:),    ALLOCATABLE ::BUFF8
@@ -5327,14 +5333,16 @@ C5A ----FOR MULTIFILE OUTPUT OPTION, ADD COMPONENT SPECIES TO ROOT NAME AND OPEN
         CFILENAME = trim(CROOTNAME) // TRIM(TEXT) //'_CLN.CON'
         ISTATUS = 'OLD'
         FORMC = 'FORMATTED'
+        ACCESC = 'SEQUENTIAL'
         IF(CSPCFM.EQ.' ') FORMC = FORM        ! - use FORM from openspec.inc rather than hardwiring BINARY or UNFORMATTED     
+        IF(CSPCFM.EQ.' ') ACCESC = ACCESS
 CC        IF(KSTP.EQ.1.AND.KPER.EQ.1) THEN
 C---------MAKE STATUS OF FILE AS NEW WHEN FIRST ENTERING FILE
 CC          ISTATUS = 'REPLACE'
 CC        ENDIF
 C
 !        OPEN(ICLNCN, FILE = CFILENAME, FORM = 'BINARY',   
-        OPEN(ICLNCN, FILE = CFILENAME, FORM = FORMC,
+        OPEN(ICLNCN, FILE = CFILENAME, FORM = FORMC, ACCESS = ACCESC,
      1  STATUS = ISTATUS, POSITION = 'APPEND')
       ENDIF
 C--------------------------------------------------------------------------------------------------------------------
