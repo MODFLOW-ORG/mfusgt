@@ -107,6 +107,10 @@ jobs:
         run: |
           otool -L mfusgt
           otool -L mfusgtdbl
+          if otool -L mfusgt mfusgtdbl | grep -E 'libgfortran|libgcc_s|libquadmath'; then
+            echo "error: binaries dynamically link gcc/gfortran runtime libraries"
+            exit 1
+          fi
           lipo -info mfusgt
           lipo -info mfusgtdbl
 
